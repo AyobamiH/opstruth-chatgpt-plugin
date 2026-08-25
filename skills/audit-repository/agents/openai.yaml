@@ -1,0 +1,11 @@
+interface:
+  display_name: "Audit Repository"
+  short_description: "Inspect a public GitHub repository with evidence"
+  default_prompt: "Audit this public GitHub repository and clearly separate verified evidence from remaining proof gaps."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "opstruth"
+      description: "Read-only public GitHub repository verification"
+      transport: "streamable_http"
+      url: "https://opstruth-chatgpt.woeinvests.workers.dev/mcp"

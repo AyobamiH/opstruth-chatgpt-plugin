@@ -1,0 +1,11 @@
+interface:
+  display_name: "Reconcile Agent Claims"
+  short_description: "Check agent claims against repository evidence"
+  default_prompt: "Compare these coding-agent claims with the available repository evidence."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "opstruth"
+      description: "Evidence tools and least-authority capability routing"
+      transport: "streamable_http"
+      url: "https://opstruth-chatgpt.woeinvests.workers.dev/mcp"

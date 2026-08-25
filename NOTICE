@@ -1,0 +1,9 @@
+OpsTruth ChatGPT Plugin
+Copyright 2026 AYOBAMI JOHN HAASTRUP
+
+This product implements independent compatibility with the AgentProof signed receipt v2 protocol described by:
+https://github.com/AyobamiH/agentproof
+
+AgentProof is licensed under the Apache License 2.0. No AgentProof execution or signing implementation is bundled in this release.
+
+Additional MIT-licensed source systems and their exact revisions are identified in provenance/sources.json.

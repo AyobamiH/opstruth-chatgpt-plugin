@@ -1,0 +1,11 @@
+interface:
+  display_name: "Trace Application"
+  short_description: "Trace routes, APIs and runtime boundaries"
+  default_prompt: "Trace this application's visible routes and runtime boundaries without claiming live behavior."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "opstruth"
+      description: "Static route, API, environment and deployment tracing"
+      transport: "streamable_http"
+      url: "https://opstruth-chatgpt.woeinvests.workers.dev/mcp"

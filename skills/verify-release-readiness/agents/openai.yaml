@@ -1,0 +1,11 @@
+interface:
+  display_name: "Verify Release Readiness"
+  short_description: "Check visible release and deployment evidence"
+  default_prompt: "Check whether this public repository is ready for release and show the missing proof."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "opstruth"
+      description: "Read-only release and deployment evidence checks"
+      transport: "streamable_http"
+      url: "https://opstruth-chatgpt.woeinvests.workers.dev/mcp"

@@ -1,0 +1,19 @@
+{
+  "name": "opstruth-chatgpt-plugin",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Hybrid ChatGPT and Codex plugin for evidence-first repository verification.",
+  "scripts": {
+    "lint": "node scripts/check-source.mjs",
+    "test": "node --test",
+    "validate:plugin": "node scripts/validate-plugin.mjs",
+    "check": "npm run lint && npm test && npm run validate:plugin",
+    "dev": "npx wrangler dev",
+    "deploy": "npx wrangler deploy"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,11 @@
+interface:
+  display_name: "Review Change Safety"
+  short_description: "Review change risks before consequential work"
+  default_prompt: "Review this repository's change safety and identify the next proof gate."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "opstruth"
+      description: "Read-only change-risk and authority planning tools"
+      transport: "streamable_http"
+      url: "https://opstruth-chatgpt.woeinvests.workers.dev/mcp"
