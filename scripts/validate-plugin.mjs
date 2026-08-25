@@ -11,7 +11,12 @@ if (manifest.name !== "opstruth") errors.push("plugin name must remain opstruth"
 if (manifest.version !== "0.2.0") errors.push("plugin version mismatch");
 if (manifest.author?.name !== "AYOBAMI JOHN HAASTRUP") errors.push("verified publisher name mismatch");
 if (manifest.skills !== "./skills/") errors.push("skills path must be relative");
+if (manifest.interface?.logo !== "./assets/logo-mark.png") errors.push("interface logo must reference the square product mark");
+if (manifest.interface?.composerIcon !== "./assets/logo-mark.png") errors.push("composer icon must reference the square product mark");
 if (!Array.isArray(provenance.sources) || provenance.sources.length < 6) errors.push("provenance must cover all source systems");
+
+const logo = await stat(new URL(`../${manifest.interface?.logo || "missing"}`, import.meta.url)).catch(() => null);
+if (!logo?.isFile() || logo.size === 0) errors.push("square product mark is missing or empty");
 
 const skillRoot = new URL("../skills", import.meta.url);
 const skillNames = await readdir(skillRoot);
