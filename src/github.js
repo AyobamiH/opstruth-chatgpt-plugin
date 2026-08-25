@@ -4,8 +4,8 @@ const MAX_TREE_ENTRIES = 20000;
 const MAX_FILES = 42;
 const MAX_FILE_BYTES = 120000;
 const MAX_TOTAL_BYTES = 1200000;
-const MAX_ARCHIVE_COMPRESSED_BYTES = 8 * 1024 * 1024;
-const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
+const MAX_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;
+const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
 const decoder = new TextDecoder();
 const TEXT_EXTENSIONS = new Set([
   "js", "jsx", "ts", "tsx", "mjs", "cjs", "json", "jsonc", "md", "mdx", "yaml", "yml",
@@ -257,12 +257,11 @@ async function loadArchiveSnapshot(repository, ctx) {
   if (response.status === 404) throw new Error("Repository was not found or is not public");
   if (!response.ok) throw new Error(`GitHub archive request failed with status ${response.status}`);
   const contentLength = Number(response.headers.get("content-length") || 0);
-  if (contentLength > MAX_ARCHIVE_COMPRESSED_BYTES) throw new Error("GitHub archive exceeded the 8 MiB compressed safety limit");
+  if (contentLength > MAX_ARCHIVE_COMPRESSED_BYTES) throw new Error("GitHub archive exceeded the 64 MiB compressed safety limit");
 
-  const compressed = await readBounded(response.body, MAX_ARCHIVE_COMPRESSED_BYTES, "GitHub archive");
   let decompressedStream;
   try {
-    decompressedStream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+    decompressedStream = response.body.pipeThrough(new DecompressionStream("gzip"));
   } catch {
     throw new Error("GitHub archive could not be decompressed");
   }
