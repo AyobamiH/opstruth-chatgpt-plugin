@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { loadRepositorySnapshot, parseRepository } from "../src/github.js";
 import { auditSecrets, fullAudit, traceRoutes } from "../src/audits.js";
-import { installGithubFetchMock } from "./fixtures.js";
+import { installGithubFetchMock, installRateLimitedGithubFetchMock } from "./fixtures.js";
 
 test("repository parser accepts only public github identifiers", () => {
   assert.equal(parseRepository("Example/project").fullName, "Example/project");
@@ -31,6 +31,27 @@ test("snapshot and audits remain bounded and redact secret values", async () => 
     const audit = fullAudit(snapshot);
     assert.equal(audit.changedState.changed, false);
     assert.ok(audit.details.environment.referencedVariableNames.includes("API_BASE_URL"));
+    assert.ok(audit.details.deployment.platforms.includes("Cloudflare"));
+  } finally {
+    restore();
+  }
+});
+
+test("rate-limited GitHub API falls back to a bounded public archive", async () => {
+  const restore = installRateLimitedGithubFetchMock();
+  try {
+    const snapshot = await loadRepositorySnapshot("Example/project");
+    assert.equal(snapshot.repository.fullName, "Example/project");
+    assert.equal(snapshot.repository.metadataSource, "public-archive-fallback");
+    assert.equal(snapshot.repository.headCommitSha, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    assert.equal(snapshot.limits.archiveFallback, true);
+    assert.ok(snapshot.tree.some((entry) => entry.path === "package.json"));
+    assert.ok(snapshot.files.some((file) => file.path === "package.json"));
+    assert.equal(snapshot.files.some((file) => file.path === ".env"), false);
+
+    const audit = fullAudit(snapshot);
+    assert.equal(audit.status, "complete");
+    assert.equal(audit.changedState.changed, false);
     assert.ok(audit.details.deployment.platforms.includes("Cloudflare"));
   } finally {
     restore();

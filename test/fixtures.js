@@ -1,3 +1,5 @@
+import { gzipSync } from "node:zlib";
+
 export const repositoryMetadata = {
   full_name: "Example/project",
   html_url: "https://github.com/Example/project",
@@ -58,6 +60,67 @@ export function installGithubFetchMock() {
       const path = parts.slice(3).map(decodeURIComponent).join("/");
       if (Object.hasOwn(fileBodies, path)) return new Response(fileBodies[path]);
       return new Response("not found", { status: 404 });
+    }
+    return new Response("unexpected", { status: 500 });
+  };
+  return () => { globalThis.fetch = original; };
+}
+
+function tarField(header, value, offset, length) {
+  Buffer.from(String(value)).copy(header, offset, 0, length);
+}
+
+function tarHeader(path, size) {
+  const header = Buffer.alloc(512);
+  tarField(header, path, 0, 100);
+  tarField(header, "0000644\0", 100, 8);
+  tarField(header, "0000000\0", 108, 8);
+  tarField(header, "0000000\0", 116, 8);
+  tarField(header, `${size.toString(8).padStart(11, "0")}\0`, 124, 12);
+  tarField(header, "00000000000\0", 136, 12);
+  header.fill(32, 148, 156);
+  tarField(header, "0", 156, 1);
+  tarField(header, "ustar\0", 257, 6);
+  tarField(header, "00", 263, 2);
+  const checksum = [...header].reduce((total, byte) => total + byte, 0);
+  tarField(header, `${checksum.toString(8).padStart(6, "0")}\0 `, 148, 8);
+  return header;
+}
+
+export function repositoryArchive() {
+  const parts = [];
+  for (const [path, body] of Object.entries(fileBodies)) {
+    if (path === ".env") continue;
+    const bytes = Buffer.from(body);
+    parts.push(tarHeader(`project-abc123/${path}`, bytes.length), bytes);
+    const padding = (512 - (bytes.length % 512)) % 512;
+    if (padding) parts.push(Buffer.alloc(padding));
+  }
+  parts.push(Buffer.alloc(1024));
+  return gzipSync(Buffer.concat(parts));
+}
+
+export function installRateLimitedGithubFetchMock() {
+  const original = globalThis.fetch;
+  const archive = repositoryArchive();
+  globalThis.fetch = async (request) => {
+    const url = new URL(typeof request === "string" ? request : request.url);
+    if (url.hostname === "api.github.com") {
+      return Response.json({ message: "rate limit" }, {
+        status: 403,
+        headers: { "x-ratelimit-remaining": "0" },
+      });
+    }
+    if (url.hostname === "github.com" && url.pathname === "/Example/project/archive/HEAD.tar.gz") {
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://codeload.github.com/Example/project/tar.gz/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+      });
+    }
+    if (url.hostname === "codeload.github.com") {
+      return new Response(archive, {
+        headers: { "content-type": "application/x-gzip", "content-length": String(archive.length) },
+      });
     }
     return new Response("unexpected", { status: 500 });
   };
