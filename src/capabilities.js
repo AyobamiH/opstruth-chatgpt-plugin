@@ -8,11 +8,14 @@ export const CAPABILITIES = [
   { tool: "opstruth_audit_secrets", name: "Secret-risk audit", authority: "read", source: "coding-agent-skills", terms: ["secret", "credential", "token", "key", "password", "security"] },
   { tool: "opstruth_review_api_contracts", name: "API contract review", authority: "read", source: "coding-agent-skills", terms: ["api", "contract", "openapi", "graphql", "schema", "endpoint"] },
   { tool: "opstruth_review_migrations", name: "Migration review", authority: "read", source: "coding-agent-skills", terms: ["migration", "database", "sql", "schema", "rls", "policy"] },
-  { tool: "opstruth_check_github_handoff", name: "GitHub handoff", authority: "read", source: "coding-agent-skills", terms: ["github", "ci", "pull", "request", "handoff", "workflow", "review"] },
+  { tool: "opstruth_check_github_handoff", name: "GitHub and CI handoff", authority: "read", source: "coding-agent-skills", terms: ["github", "ci", "check", "checks", "pull", "request", "handoff", "workflow", "review"] },
   { tool: "opstruth_check_deployment", name: "Deployment preflight", authority: "read", source: "coding-agent-skills", terms: ["deploy", "deployment", "release", "publish", "cloudflare", "vercel", "hosting"] },
+  { tool: "opstruth_probe_deployment", name: "Deployment health probe", authority: "read", source: "opstruth", terms: ["health", "healthy", "live", "reachable", "deployment", "endpoint", "probe"] },
+  { tool: "opstruth_prepare_sandbox_verification", name: "Sandbox verification handoff", authority: "plan", source: "coding-workflow-library", terms: ["build", "test", "typecheck", "verify", "execute", "sandbox", "runner", "command"] },
   { tool: "opstruth_plan_workflow", name: "Workflow planner", authority: "plan", source: "coding-workflow-library", terms: ["plan", "workflow", "orchestrate", "sequence", "next", "checkpoint"] },
   { tool: "opstruth_discover_capabilities", name: "Capability discovery", authority: "read", source: "capability-intelligence", terms: ["capability", "discover", "existing", "reuse", "tool", "skill", "mcp"] },
   { tool: "opstruth_verify_receipt", name: "Receipt verifier", authority: "read", source: "agentproof", terms: ["receipt", "signature", "signed", "agentproof", "proof", "trust"] },
+  { tool: "opstruth_verify_evidence_receipt", name: "OpsTruth evidence verifier", authority: "read", source: "opstruth", terms: ["receipt", "signature", "signed", "opstruth", "evidence", "proof", "trust"] },
 ];
 
 const WRITE_TERMS = ["write", "change", "edit", "commit", "push", "merge", "deploy", "publish", "delete", "apply", "execute", "run migration"];

@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import test from "node:test";
-import { verifyAgentProofReceipt } from "../src/receipt.js";
-import { stableJson } from "../src/utils.js";
+import { verifyAgentProofReceipt, verifyOpsTruthEvidenceReceipt } from "../src/receipt.js";
+import { evidenceReceipt, stableJson } from "../src/utils.js";
 
 function fixtureReceipt() {
   const { publicKey, privateKey } = generateKeyPairSync("ed25519");
@@ -54,4 +54,25 @@ test("AgentProof receipt verifier rejects digest drift", async () => {
   const result = await verifyAgentProofReceipt(document, []);
   assert.equal(result.cryptographicallyValid, false);
   assert.equal(result.reason, "digest_mismatch");
+});
+
+test("OpsTruth evidence receipt verification separates validity from trust", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const env = {
+    OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI: publicKey.export({ type: "spki", format: "pem" }).toString(),
+  };
+  const payload = { status: "complete", verified: ["fixture"], changedState: { changed: false } };
+  const report = { ...payload, receipt: await evidenceReceipt(payload, env) };
+  const untrusted = await verifyOpsTruthEvidenceReceipt(report, []);
+  assert.equal(untrusted.cryptographicallyValid, true);
+  assert.equal(untrusted.trusted, false);
+  const trusted = await verifyOpsTruthEvidenceReceipt(report, [report.receipt.signerFingerprint]);
+  assert.equal(trusted.cryptographicallyValid, true);
+  assert.equal(trusted.trusted, true);
+
+  report.verified.push("tampered");
+  const tampered = await verifyOpsTruthEvidenceReceipt(report, [report.receipt.signerFingerprint]);
+  assert.equal(tampered.cryptographicallyValid, false);
+  assert.equal(tampered.reason, "digest_mismatch");
 });

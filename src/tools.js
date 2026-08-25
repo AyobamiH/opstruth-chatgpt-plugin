@@ -10,8 +10,10 @@ import {
   traceRoutes,
 } from "./audits.js";
 import { discoverCapabilities, planWorkflow } from "./capabilities.js";
+import { probeDeployment } from "./deployment.js";
 import { loadRepositorySnapshot } from "./github.js";
-import { verifyAgentProofReceipt } from "./receipt.js";
+import { verifyAgentProofReceipt, verifyOpsTruthEvidenceReceipt } from "./receipt.js";
+import { prepareSandboxVerification } from "./sandbox.js";
 import { EVIDENCE_UI_URI } from "./ui.js";
 import { evidenceReceipt, textResult } from "./utils.js";
 
@@ -52,8 +54,41 @@ export const TOOL_DEFINITIONS = [
   tool("opstruth_audit_secrets", "Audit secret exposure risk", "Scan bounded public source for selected secret-like patterns. Returns only redacted pattern types and locations, never matched values."),
   tool("opstruth_review_api_contracts", "Review API contracts", "Inventory visible API handlers, OpenAPI, GraphQL, schema and contract paths. Does not call or validate deployed APIs."),
   tool("opstruth_review_migrations", "Review migrations", "Inventory visible migration files and selected static risk indicators without connecting to or changing a database."),
-  tool("opstruth_check_github_handoff", "Check GitHub handoff", "Check visible CI workflows, contribution guidance, pull request templates, test script names and handoff evidence without changing GitHub."),
+  tool("opstruth_check_github_handoff", "Check GitHub handoff", "Check current public GitHub Actions, check-run, commit-status and branch-protection evidence alongside visible workflows and handoff files without changing GitHub."),
   tool("opstruth_check_deployment", "Check deployment readiness", "Inspect visible deployment configuration, platform indicators and package script names without building, deploying or calling provider APIs."),
+  tool(
+    "opstruth_probe_deployment",
+    "Probe deployment health",
+    "Probe explicitly supplied public HTTPS health paths with bounded HEAD requests and a GET fallback only when HEAD is unsupported. Returns status and headers without retaining response bodies.",
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["deployment_url"],
+      properties: {
+        deployment_url: { type: "string", minLength: 9, maxLength: 300, pattern: "^https://" },
+        health_paths: {
+          type: "array",
+          maxItems: 8,
+          items: { type: "string", minLength: 1, maxLength: 200, pattern: "^/" },
+        },
+      },
+    },
+    { annotations: { ...READ_ONLY, openWorldHint: true } },
+  ),
+  tool(
+    "opstruth_prepare_sandbox_verification",
+    "Prepare sandbox verification",
+    "Prepare an approval-gated handoff for a separately connected isolated runner using only visible repository-declared package scripts. This public tool never executes code.",
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["repository_url"],
+      properties: {
+        repository_url: REPOSITORY_INPUT.properties.repository_url,
+        objective: { type: ["string", "null"], maxLength: 1000 },
+      },
+    },
+  ),
   tool(
     "opstruth_discover_capabilities",
     "Discover existing capabilities",
@@ -98,6 +133,24 @@ export const TOOL_DEFINITIONS = [
     },
   ),
   tool(
+    "opstruth_verify_evidence_receipt",
+    "Verify OpsTruth evidence receipt",
+    "Verify an OpsTruth evidence report digest, Ed25519 signature and optional signer trust without repeating the repository inspection or deployment probe.",
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["report"],
+      properties: {
+        report: { type: "object", additionalProperties: true },
+        trusted_signer_fingerprints: {
+          type: "array",
+          maxItems: 50,
+          items: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+        },
+      },
+    },
+  ),
+  tool(
     "opstruth_render_evidence",
     "Render evidence report",
     "Render a previously returned OpsTruth report as an interactive evidence summary. Always obtain the report from another OpsTruth data tool first.",
@@ -127,10 +180,11 @@ const REPOSITORY_HANDLERS = new Map([
   ["opstruth_review_migrations", reviewMigrations],
   ["opstruth_check_github_handoff", checkGithubHandoff],
   ["opstruth_check_deployment", checkDeployment],
+  ["opstruth_prepare_sandbox_verification", (snapshot, args) => prepareSandboxVerification(snapshot, args.objective || null)],
 ]);
 
-async function withReceipt(report) {
-  return { ...report, receipt: await evidenceReceipt(report) };
+async function withReceipt(report, env = {}) {
+  return { ...report, receipt: await evidenceReceipt(report, env) };
 }
 
 function summary(report) {
@@ -143,28 +197,36 @@ function summary(report) {
 export async function callTool(name, args = {}, env = {}, ctx = {}) {
   if (REPOSITORY_HANDLERS.has(name)) {
     const snapshot = await loadRepositorySnapshot(args.repository_url, env, ctx);
-    const report = await withReceipt(REPOSITORY_HANDLERS.get(name)(snapshot));
+    const report = await withReceipt(await REPOSITORY_HANDLERS.get(name)(snapshot, args), env);
     return textResult(report, summary(report));
+  }
+  if (name === "opstruth_probe_deployment") {
+    const report = await withReceipt(await probeDeployment(args), env);
+    return textResult(report, `OpsTruth deployment probe: ${report.status}. ${report.probes.length} public HTTPS path(s) checked, no state changed.`);
   }
   if (name === "opstruth_discover_capabilities") {
     const report = await withReceipt({
       ...discoverCapabilities(args.objective),
       changedState: { changed: false, summary: "Recommendation only." },
-      provenance: ["capability-intelligence@6ca93fb", "opstruth-chatgpt-plugin@0.2.0"],
-    });
+      provenance: ["capability-intelligence@6ca93fb", "opstruth-chatgpt-plugin@0.3.0"],
+    }, env);
     return textResult(report, `OpsTruth capability recommendation: ${report.recommendation?.tool || report.status}. No capability was invoked.`);
   }
   if (name === "opstruth_plan_workflow") {
     const report = await withReceipt({
       ...planWorkflow(args.objective, args.repository_url || null),
       changedState: { changed: false, summary: "Planning only." },
-      provenance: ["autonomous-coding-workflow-library@0dca8cc", "opstruth-chatgpt-plugin@0.2.0"],
-    });
+      provenance: ["autonomous-coding-workflow-library@0dca8cc", "opstruth-chatgpt-plugin@0.3.0"],
+    }, env);
     return textResult(report, `OpsTruth planned ${report.stages.length} verification stage(s). No stage was executed.`);
   }
   if (name === "opstruth_verify_receipt") {
     const report = await verifyAgentProofReceipt(args.document, args.trusted_signer_fingerprints || []);
     return textResult(report, `AgentProof receipt verification: ${report.reason}. Cryptographically valid: ${report.cryptographicallyValid}. Trusted: ${report.trusted}.`);
+  }
+  if (name === "opstruth_verify_evidence_receipt") {
+    const report = await verifyOpsTruthEvidenceReceipt(args.report, args.trusted_signer_fingerprints || []);
+    return textResult(report, `OpsTruth evidence receipt verification: ${report.reason}. Cryptographically valid: ${report.cryptographicallyValid}. Trusted: ${report.trusted}.`);
   }
   if (name === "opstruth_render_evidence") {
     const report = args.report && typeof args.report === "object" ? args.report : null;

@@ -9,5 +9,6 @@ description: Trace statically visible application routes, API surfaces, environm
 2. Call `opstruth_review_api_contracts` for API handlers, OpenAPI files, GraphQL surfaces and contract artifacts.
 3. Call `opstruth_audit_environment` for environment variable names and configuration surfaces without values.
 4. Call `opstruth_check_deployment` when the trace must reach the visible deployment entry point.
-5. Label inferred route relationships as static inference.
-6. Never claim that a route responds, a socket is listening, an environment value exists or a deployment is healthy unless separate runtime evidence proves it.
+5. Call `opstruth_probe_deployment` only for an explicitly supplied public HTTPS URL and relevant health paths. Do not invent or probe URLs inferred from source.
+6. Label file-system, Express-style, router and OpenAPI relationships as static inference.
+7. Never claim that a route responds, a socket is listening, an environment value exists or an application works merely because a health probe returned successfully.

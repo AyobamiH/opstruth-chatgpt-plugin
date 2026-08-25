@@ -1,7 +1,7 @@
 import { declaredEnvironmentNames, fileContents, fileMap, paths } from "./github.js";
 import { bounded, unique } from "./utils.js";
 
-const SOURCE_VERSION = "0.2.0";
+const SOURCE_VERSION = "0.3.0";
 
 function report(snapshot, skill) {
   return {
@@ -21,9 +21,9 @@ function report(snapshot, skill) {
     skipped: [],
     notVerified: [
       "Local working-tree state",
-      "Build and test execution",
+      "Fresh build and test execution by OpsTruth",
       "Runtime behavior",
-      "Private CI, provider and deployment state",
+      "Private CI and provider configuration",
     ],
     evidence: [],
     changedState: { changed: false, summary: "Read-only public GitHub inspection only." },
@@ -138,17 +138,48 @@ function routeFromFile(path) {
   return null;
 }
 
+function normalizedRoute(value) {
+  const route = String(value || "").trim();
+  if (!route.startsWith("/") || route.startsWith("//") || route.length > 240) return null;
+  return route.replace(/\/{2,}/g, "/");
+}
+
+function extractedRoutes(file) {
+  const routes = [];
+  const add = (path, kind, method = null) => {
+    const normalized = normalizedRoute(path);
+    if (normalized) routes.push({ path: normalized, kind, ...(method ? { method } : {}), source: file.path });
+  };
+
+  const methodPattern = /\b(?:app|router|server|api|fastify|hono)\s*\.\s*(get|post|put|patch|delete|options|head|all|use)\s*\(\s*(["'`])([^"'`\r\n]+)\2/g;
+  for (const match of file.text.matchAll(methodPattern)) add(match[3], "http-handler", match[1].toUpperCase());
+
+  const chainedPattern = /\b(?:app|router|server|api|fastify|hono)\s*\.\s*route\s*\(\s*(["'`])([^"'`\r\n]+)\1\s*\)\s*\.\s*(get|post|put|patch|delete|options|head|all)/g;
+  for (const match of file.text.matchAll(chainedPattern)) add(match[2], "http-handler", match[3].toUpperCase());
+
+  for (const match of file.text.matchAll(/<Route\b[^>]*\bpath\s*=\s*(["'])([^"']+)\1/g)) add(match[2], "declared-route");
+  for (const match of file.text.matchAll(/\bpath\s*=\s*(["'])([^"']+)\1/g)) add(match[2], "declared-route");
+
+  if (/(?:openapi|swagger)/i.test(file.path)) {
+    for (const match of file.text.matchAll(/(["'])(\/[^"'\r\n]+)\1\s*:/g)) add(match[2], "contract-route");
+  }
+  return routes;
+}
+
+export function staticRoutes(snapshot) {
+  const fileRoutes = paths(snapshot).map(routeFromFile).filter(Boolean);
+  const declaredRoutes = fileContents(snapshot).flatMap(extractedRoutes);
+  return [...new Map([...fileRoutes, ...declaredRoutes].map((route) => [
+    `${route.method || "ANY"}:${route.path}:${route.source}`,
+    route,
+  ])).values()];
+}
+
 export function traceRoutes(snapshot) {
   const result = report(snapshot, "route-trace");
-  const fileRoutes = paths(snapshot).map(routeFromFile).filter(Boolean);
-  const declaredRoutes = [];
-  for (const file of fileContents(snapshot)) {
-    for (const match of file.text.matchAll(/\bpath\s*=\s*["']([^"']+)["']/g)) {
-      declaredRoutes.push({ path: match[1], kind: "declared-route", source: file.path });
-    }
-  }
-  result.routes = bounded([...fileRoutes, ...declaredRoutes], 250);
-  result.verified.push("Statically visible file-system and declared route patterns");
+  result.routes = bounded(staticRoutes(snapshot), 250);
+  result.verified.push("Statically visible file-system, Express-style, router and contract route patterns");
+  if (!result.routes.length) result.warnings.push("No route patterns were found in the bounded source selection.");
   result.notVerified.push("Route reachability", "Middleware effects", "Authentication behavior", "Live responses");
   result.evidence.push(evidencePath("Route sources", result.routes.map((route) => route.source)));
   return result;
@@ -158,7 +189,12 @@ export function reviewApiContracts(snapshot) {
   const result = report(snapshot, "api-contract-audit");
   const allPaths = paths(snapshot);
   const contracts = allPaths.filter((path) => /(?:openapi|swagger|graphql|schema|contract)/i.test(path) && /\.(?:json|ya?ml|graphql|gql|ts|js)$/i.test(path));
-  const handlers = allPaths.filter((path) => /(?:^|\/)(?:api\/|route\.(?:js|jsx|ts|tsx)$)/i.test(path));
+  const routeSources = staticRoutes(snapshot).filter((route) => route.kind === "http-handler" || route.kind === "api-handler")
+    .map((route) => route.source);
+  const handlers = unique([
+    ...allPaths.filter((path) => /(?:^|\/)(?:api\/|route\.(?:js|jsx|ts|tsx)$)/i.test(path)),
+    ...routeSources,
+  ]);
   result.apiContracts = { contracts: bounded(contracts, 150), handlers: bounded(handlers, 200) };
   result.verified.push("Visible API contract and handler paths");
   if (handlers.length && !contracts.length) result.warnings.push("API handlers are visible but no explicit contract artifact was detected.");
@@ -196,20 +232,56 @@ export function checkGithubHandoff(snapshot) {
   const result = report(snapshot, "github-handoff");
   const allPaths = paths(snapshot);
   const workflows = allPaths.filter((path) => path.startsWith(".github/workflows/"));
+  const licenceFiles = allPaths.filter((path) => /(?:^|\/)licen[cs]e(?:\.|$)/i.test(path));
+  const githubSpdx = snapshot.repository.license || null;
+  const licenceStatus = githubSpdx && licenceFiles.length ? "consistent"
+    : githubSpdx ? "metadata_only"
+      : licenceFiles.length ? "tree_only" : "absent";
+  const githubStatus = snapshot.githubStatus || null;
   const signals = {
     workflows,
     contributing: allPaths.some((path) => /(?:^|\/)contributing\.md$/i.test(path)),
     pullRequestTemplate: allPaths.some((path) => /pull_request_template/i.test(path)),
     securityPolicy: allPaths.some((path) => /(?:^|\/)security\.md$/i.test(path)),
-    licence: Boolean(snapshot.repository.license || allPaths.some((path) => /(?:^|\/)licen[cs]e(?:\.|$)/i.test(path))),
+    licence: {
+      present: Boolean(githubSpdx || licenceFiles.length),
+      githubSpdx,
+      detectedFiles: bounded(licenceFiles, 20),
+      status: licenceStatus,
+    },
     packageScriptNames: packageScripts(snapshot),
+    publicGithubStatus: githubStatus,
   };
   result.githubHandoff = signals;
   result.verified.push("Visible GitHub workflow and handoff files", "Package script names");
   if (!workflows.length) result.warnings.push("No GitHub Actions workflow was visible.");
   if (!signals.pullRequestTemplate) result.warnings.push("No pull request template was visible.");
-  result.notVerified.push("Latest workflow result", "Branch protection", "Review approvals", "Unpushed local commits");
+  if (licenceStatus === "tree_only") result.warnings.push("A licence file is visible, but GitHub did not report a recognised SPDX licence.");
+  if (licenceStatus === "metadata_only") result.warnings.push("GitHub reports a licence, but no licence file was visible in the bounded tree.");
+
+  if (githubStatus?.workflowRuns?.available) {
+    result.verified.push("Latest public GitHub Actions workflow evidence");
+    const latest = githubStatus.workflowRuns.latest || [];
+    const nonPassing = latest.filter((run) => run.status !== "completed" || (run.conclusion && !["success", "neutral", "skipped"].includes(run.conclusion)));
+    if (!latest.length) result.warnings.push("GitHub reported no public workflow runs for the default branch.");
+    if (nonPassing.length) result.warnings.push(`${nonPassing.length} recent public workflow run(s) are incomplete or not passing.`);
+  } else result.notVerified.push("Latest public workflow result");
+
+  if (githubStatus?.checkRuns?.available) result.verified.push("Current default-branch check-run evidence");
+  else result.notVerified.push("Current default-branch check runs");
+
+  if (githubStatus?.commitStatus?.available) result.verified.push("Current default-branch combined commit status");
+  else result.notVerified.push("Current default-branch combined commit status");
+
+  if (githubStatus?.branchProtection?.available) {
+    result.verified.push("Default-branch protection flag");
+    if (!githubStatus.branchProtection.protected) result.warnings.push("GitHub reports that the default branch is not protected.");
+  } else result.notVerified.push("Branch protection");
+  result.notVerified.push("Review approvals", "Unpushed local commits");
   result.evidence.push(evidencePath("Workflow paths", workflows));
+  if (githubStatus?.workflowRuns?.latest?.length) {
+    result.evidence.push(evidencePath("Recent public workflow runs", githubStatus.workflowRuns.latest.map((run) => run.htmlUrl || `${run.name}:${run.conclusion || run.status}`)));
+  }
   return result;
 }
 

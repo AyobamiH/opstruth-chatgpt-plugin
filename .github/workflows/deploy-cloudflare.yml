@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "src/**"
+      - "scripts/generate-signing-key.mjs"
       - "wrangler.jsonc"
       - "package.json"
       - ".github/workflows/deploy-cloudflare.yml"
@@ -30,3 +31,18 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
       - run: npx wrangler deploy
+      - name: Provision stable evidence-signing key once
+        shell: bash
+        run: |
+          set -euo pipefail
+          secret_list="$RUNNER_TEMP/opstruth-secret-list.json"
+          npx wrangler secret list > "$secret_list"
+          if grep -q 'OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8' "$secret_list" && grep -q 'OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI' "$secret_list"; then
+            exit 0
+          fi
+          private_key="$RUNNER_TEMP/opstruth-private.pem"
+          public_key="$RUNNER_TEMP/opstruth-public.pem"
+          node scripts/generate-signing-key.mjs "$private_key" "$public_key"
+          npx wrangler secret put OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8 < "$private_key"
+          npx wrangler secret put OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI < "$public_key"
+          rm -f "$private_key" "$public_key" "$secret_list"

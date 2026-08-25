@@ -8,7 +8,7 @@ const provenance = JSON.parse(await readFile(new URL("../provenance/sources.json
 const errors = [];
 
 if (manifest.name !== "opstruth") errors.push("plugin name must remain opstruth");
-if (manifest.version !== "0.2.0") errors.push("plugin version mismatch");
+if (manifest.version !== "0.3.0") errors.push("plugin version mismatch");
 if (manifest.author?.name !== "AYOBAMI JOHN HAASTRUP") errors.push("verified publisher name mismatch");
 if (manifest.skills !== "./skills/") errors.push("skills path must be relative");
 if (manifest.interface?.logo !== "./assets/logo-mark.png") errors.push("interface logo must reference the square product mark");
@@ -34,10 +34,12 @@ for (const name of skillNames) {
 
 const toolNames = TOOL_DEFINITIONS.map((tool) => tool.name);
 if (new Set(toolNames).size !== toolNames.length) errors.push("tool names must be unique");
-if (TOOL_DEFINITIONS.length !== 13) errors.push(`expected 13 tools, found ${TOOL_DEFINITIONS.length}`);
+if (TOOL_DEFINITIONS.length !== 16) errors.push(`expected 16 tools, found ${TOOL_DEFINITIONS.length}`);
 for (const tool of TOOL_DEFINITIONS) {
   if (tool.annotations?.readOnlyHint !== true) errors.push(`${tool.name}: must be read-only`);
   if (tool.annotations?.destructiveHint !== false) errors.push(`${tool.name}: destructive annotation mismatch`);
+  if (tool.name === "opstruth_probe_deployment" && tool.annotations?.openWorldHint !== true) errors.push("deployment probe must declare open-world access");
+  if (tool.name !== "opstruth_probe_deployment" && tool.annotations?.openWorldHint !== false) errors.push(`${tool.name}: open-world annotation mismatch`);
   if (!tool.inputSchema || !tool.outputSchema) errors.push(`${tool.name}: schemas required`);
 }
 

@@ -1,11 +1,11 @@
 interface:
   display_name: "Verify Action Receipt"
-  short_description: "Verify AgentProof v2 receipts safely"
-  default_prompt: "Verify this AgentProof receipt and separate signature validity from signer trust."
+  short_description: "Verify AgentProof and OpsTruth receipts safely"
+  default_prompt: "Verify this signed receipt and separate digest validity, signature validity and signer trust."
 dependencies:
   tools:
     - type: "mcp"
       value: "opstruth"
-      description: "Read-only AgentProof receipt verification"
+      description: "Read-only AgentProof and OpsTruth receipt verification"
       transport: "streamable_http"
       url: "https://opstruth-chatgpt.woeinvests.workers.dev/mcp"

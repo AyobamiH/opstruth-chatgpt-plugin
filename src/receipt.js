@@ -1,4 +1,4 @@
-import { sha256, stableJson } from "./utils.js";
+import { OPSTRUTH_RECEIPT_DOMAIN, pemBytes, sha256, stableJson } from "./utils.js";
 
 const RECEIPT_DOMAIN = "agentproof.signed-receipt.v2\0";
 const HEX = /^[a-f0-9]{64}$/;
@@ -99,6 +99,84 @@ function invalid(reason, errors, signerFingerprint) {
     signerFingerprint,
     reason,
     verifiedClaims: null,
+    errors,
+    warnings: [],
+  };
+}
+
+export async function verifyOpsTruthEvidenceReceipt(report, trustedSignerFingerprints = []) {
+  if (!report || typeof report !== "object" || !report.receipt || typeof report.receipt !== "object") {
+    return evidenceInvalid("invalid_structure", ["report_with_receipt_required"], null);
+  }
+  const receipt = report.receipt;
+  if (receipt.schema !== "opstruth.evidence-receipt" || receipt.schemaVersion !== "2.0.0") {
+    return evidenceInvalid("invalid_structure", ["unsupported_receipt_schema"], receipt.signerFingerprint || null);
+  }
+  if (receipt.signed !== true) {
+    return {
+      schema: "opstruth.evidence-receipt-verification-result",
+      schemaVersion: "2.0.0",
+      digestValid: false,
+      cryptographicallyValid: false,
+      trusted: false,
+      signerFingerprint: null,
+      reason: "unsigned",
+      errors: ["receipt_is_not_signed"],
+      warnings: [],
+    };
+  }
+  if (receipt.algorithm !== "Ed25519" || !HEX.test(String(receipt.payloadDigest || ""))
+    || !FINGERPRINT.test(String(receipt.signerFingerprint || ""))
+    || typeof receipt.publicKeyPem !== "string" || typeof receipt.signatureBase64 !== "string") {
+    return evidenceInvalid("invalid_structure", ["signed_receipt_fields_invalid"], receipt.signerFingerprint || null);
+  }
+  try {
+    const payload = { ...report };
+    delete payload.receipt;
+    const canonical = `${OPSTRUTH_RECEIPT_DOMAIN}${stableJson(payload)}`;
+    const digest = await sha256(canonical);
+    if (digest !== receipt.payloadDigest) {
+      return evidenceInvalid("digest_mismatch", ["payload_digest_mismatch"], receipt.signerFingerprint, false);
+    }
+    const publicDer = pemBytes(receipt.publicKeyPem, "PUBLIC KEY");
+    const fingerprint = `sha256:${await sha256(publicDer)}`;
+    if (fingerprint !== receipt.signerFingerprint) {
+      return evidenceInvalid("invalid_signature", ["signer_fingerprint_mismatch"], fingerprint, true);
+    }
+    const key = await crypto.subtle.importKey("spki", publicDer, { name: "Ed25519" }, false, ["verify"]);
+    const valid = await crypto.subtle.verify(
+      { name: "Ed25519" },
+      key,
+      decodeBase64(receipt.signatureBase64),
+      new TextEncoder().encode(canonical),
+    );
+    if (!valid) return evidenceInvalid("invalid_signature", ["signature_invalid"], fingerprint, true);
+    const trusted = trustedSignerFingerprints.includes(fingerprint);
+    return {
+      schema: "opstruth.evidence-receipt-verification-result",
+      schemaVersion: "2.0.0",
+      digestValid: true,
+      cryptographicallyValid: true,
+      trusted,
+      signerFingerprint: fingerprint,
+      reason: trusted ? "trusted" : "valid_untrusted_signer",
+      errors: [],
+      warnings: trusted ? [] : ["The signature is valid but the signer fingerprint was not supplied as trusted."],
+    };
+  } catch {
+    return evidenceInvalid("invalid_signature", ["verification_key_or_signature_invalid"], null, true);
+  }
+}
+
+function evidenceInvalid(reason, errors, signerFingerprint, digestValid = false) {
+  return {
+    schema: "opstruth.evidence-receipt-verification-result",
+    schemaVersion: "2.0.0",
+    digestValid,
+    cryptographicallyValid: false,
+    trusted: false,
+    signerFingerprint,
+    reason,
     errors,
     warnings: [],
   };

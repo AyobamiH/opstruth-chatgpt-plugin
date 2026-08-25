@@ -1,9 +1,9 @@
 import { bounded, unique } from "./utils.js";
 
 const MAX_TREE_ENTRIES = 20000;
-const MAX_FILES = 42;
-const MAX_FILE_BYTES = 120000;
-const MAX_TOTAL_BYTES = 1200000;
+const MAX_FILES = 64;
+const MAX_FILE_BYTES = 1024 * 1024;
+const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
 const MAX_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
 const decoder = new TextDecoder();
@@ -52,12 +52,18 @@ async function cachedFetch(request, ctx) {
   return response;
 }
 
-async function githubApi(path, ctx) {
+function githubHeaders(env = {}) {
   const headers = {
     accept: "application/vnd.github+json",
-    "user-agent": "opstruth-chatgpt-plugin/0.2.0",
+    "user-agent": "opstruth-chatgpt-plugin/0.3.0",
     "x-github-api-version": "2022-11-28",
   };
+  if (env?.GITHUB_READ_TOKEN) headers.authorization = `Bearer ${env.GITHUB_READ_TOKEN}`;
+  return headers;
+}
+
+async function githubApi(path, ctx, env = {}) {
+  const headers = githubHeaders(env);
   const request = new Request(`https://api.github.com${path}`, { headers });
   const response = await cachedFetch(request, ctx);
   if (!response.ok) {
@@ -70,6 +76,14 @@ async function githubApi(path, ctx) {
     throw new Error(`GitHub request failed with status ${response.status}`);
   }
   return response.json();
+}
+
+async function optionalGithubApi(path, ctx, env = {}) {
+  try {
+    return { available: true, value: await githubApi(path, ctx, env), reason: null };
+  } catch (error) {
+    return { available: false, value: null, reason: error?.code === "GITHUB_RATE_LIMIT" ? "rate_limited" : error.message };
+  }
 }
 
 function extension(path) {
@@ -87,14 +101,20 @@ function unsafeToRead(path) {
 function priority(path) {
   const lower = path.toLowerCase();
   const base = lower.split("/").at(-1);
-  if (["package.json", "wrangler.json", "wrangler.jsonc", "wrangler.toml", "vercel.json", "netlify.toml", "dockerfile", "tsconfig.json", "openapi.json", "openapi.yaml", "openapi.yml"].includes(base)) return 100;
-  if (lower.startsWith(".github/workflows/") || ["readme.md", "contributing.md", "security.md"].includes(base)) return 95;
-  if (/\/migrations?\//.test(`/${lower}`) || /(?:^|\/)migrations?\//.test(lower)) return 90;
-  if (/(?:^|\/)(?:app|pages)\/.+\/(?:page|route)\.(?:js|jsx|ts|tsx)$/.test(lower)) return 88;
-  if (/(?:router|routes|api|server|worker|index)\.(?:js|jsx|ts|tsx)$/.test(base)) return 80;
-  if (/^(?:src|app|pages|api|server|worker)\//.test(lower)) return 60;
-  if (/\.(?:md|json|ya?ml|toml)$/.test(lower)) return 30;
-  return 10;
+  let score = 10;
+  if (["package.json", "pyproject.toml", "cargo.toml", "go.mod", "wrangler.json", "wrangler.jsonc", "wrangler.toml", "vercel.json", "netlify.toml", "dockerfile", "tsconfig.json", "openapi.json", "openapi.yaml", "openapi.yml"].includes(base)) score = 100;
+  else if (lower.startsWith(".github/workflows/") || ["readme.md", "contributing.md", "security.md"].includes(base)) score = 95;
+  else if (/(?:^|\/)migrations?\//.test(lower)) score = 90;
+  else if (/(?:^|\/)(?:app|pages)\/.+\/(?:page|route)\.(?:js|jsx|ts|tsx)$/.test(lower)) score = 92;
+  else if (/(?:^|\/)src\/(?:index|app|server|router|routes|api|worker)\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(lower)) score = 96;
+  else if (/(?:router|routes|api|server|worker|index)\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(base)) score = 84;
+  else if (/(?:^|\/)(?:src|app|pages|api|server|worker)\//.test(lower)) score = 62;
+  else if (/\.(?:md|json|ya?ml|toml)$/.test(lower)) score = 30;
+
+  if (/(?:^|\/)(?:node_modules|dist|build|coverage|vendor|third[_-]?party|\.next|\.cache|fixtures?|__snapshots__)(?:\/|$)/.test(lower)) return -100;
+  if (/(?:^|\/)(?:openai-cookbook|openclaw-docs|cookbook)(?:\/|$)/.test(lower)) score -= 90;
+  else if (/(?:^|\/)(?:test|tests|examples?|docs)(?:\/|$)/.test(lower) && score < 90) score -= 70;
+  return score;
 }
 
 function selectFiles(tree) {
@@ -102,6 +122,7 @@ function selectFiles(tree) {
     .filter((entry) => entry.type === "blob" && Number(entry.size || 0) <= MAX_FILE_BYTES)
     .filter((entry) => TEXT_EXTENSIONS.has(extension(entry.path)) || priority(entry.path) >= 90)
     .filter((entry) => !unsafeToRead(entry.path))
+    .filter((entry) => priority(entry.path) > 0)
     .sort((left, right) => priority(right.path) - priority(left.path) || left.path.localeCompare(right.path))
     .slice(0, MAX_FILES);
 }
@@ -185,7 +206,7 @@ export function parseTarArchive(bytes) {
         }
         const isFile = type !== "5";
         tree.push({ path, type: isFile ? "blob" : "tree", size: isFile ? size : 0, sha: null });
-        if (isFile && size <= MAX_FILE_BYTES && !unsafeToRead(path)
+        if (isFile && size <= MAX_FILE_BYTES && !unsafeToRead(path) && priority(path) > 0
           && (TEXT_EXTENSIONS.has(extension(path)) || priority(path) >= 90)) {
           candidates.push({ path, text: decoder.decode(body), truncated: false });
           candidates.sort(candidateOrder);
@@ -234,7 +255,7 @@ async function loadArchiveSnapshot(repository, ctx) {
   const headUrl = `https://github.com/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/archive/HEAD.tar.gz`;
   const headResponse = await fetch(new Request(headUrl, {
     redirect: "manual",
-    headers: { "user-agent": "opstruth-chatgpt-plugin/0.2.0" },
+    headers: { "user-agent": "opstruth-chatgpt-plugin/0.3.0" },
   }));
   if (headResponse.status === 404) throw new Error("Repository was not found or is not public");
 
@@ -252,7 +273,7 @@ async function loadArchiveSnapshot(repository, ctx) {
     }
   }
 
-  const request = new Request(archiveUrl, { headers: { "user-agent": "opstruth-chatgpt-plugin/0.2.0" } });
+  const request = new Request(archiveUrl, { headers: { "user-agent": "opstruth-chatgpt-plugin/0.3.0" } });
   const response = await cachedFetch(request, ctx);
   if (response.status === 404) throw new Error("Repository was not found or is not public");
   if (!response.ok) throw new Error(`GitHub archive request failed with status ${response.status}`);
@@ -304,7 +325,7 @@ async function loadArchiveSnapshot(repository, ctx) {
 async function fetchRawFile(repository, branch, entry) {
   const encodedPath = entry.path.split("/").map(encodeURIComponent).join("/");
   const url = `https://raw.githubusercontent.com/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/${encodeURIComponent(branch)}/${encodedPath}`;
-  const response = await fetch(new Request(url, { headers: { "user-agent": "opstruth-chatgpt-plugin/0.2.0" } }));
+  const response = await fetch(new Request(url, { headers: { "user-agent": "opstruth-chatgpt-plugin/0.3.0" } }));
   if (!response.ok) return null;
   const text = (await response.text()).slice(0, MAX_FILE_BYTES);
   return { path: entry.path, text, truncated: Number(entry.size || 0) > text.length };
@@ -325,22 +346,123 @@ async function fetchSelectedFiles(repository, branch, tree) {
   return files;
 }
 
+function unavailableGithubStatus(defaultBranch, reason) {
+  return {
+    source: "github-public-api",
+    available: false,
+    reason,
+    defaultBranch,
+    headCommitSha: null,
+    branchProtection: { available: false, protected: null, reason },
+    workflowRuns: { available: false, totalObserved: 0, latest: [], reason },
+    checkRuns: { available: false, totalObserved: 0, latest: [], reason },
+    commitStatus: { available: false, state: null, contexts: [], reason },
+  };
+}
+
+async function loadGithubStatus(repository, defaultBranch, ctx, env = {}) {
+  const encodedBranch = encodeURIComponent(defaultBranch);
+  const [branchResult, workflowResult] = await Promise.all([
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/branches/${encodedBranch}`, ctx, env),
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/actions/runs?branch=${encodedBranch}&per_page=20&exclude_pull_requests=true`, ctx, env),
+  ]);
+  const headCommitSha = branchResult.value?.commit?.sha || null;
+  const [checksResult, statusResult] = headCommitSha
+    ? await Promise.all([
+      optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodeURIComponent(headCommitSha)}/check-runs?per_page=100`, ctx, env),
+      optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodeURIComponent(headCommitSha)}/status`, ctx, env),
+    ])
+    : [{ available: false, value: null, reason: branchResult.reason || "head_commit_unavailable" }, { available: false, value: null, reason: branchResult.reason || "head_commit_unavailable" }];
+
+  const workflowRuns = Array.isArray(workflowResult.value?.workflow_runs)
+    ? workflowResult.value.workflow_runs.slice(0, 20).map((run) => ({
+      id: run.id,
+      name: run.name || run.display_title || "Unnamed workflow",
+      event: run.event || null,
+      status: run.status || null,
+      conclusion: run.conclusion || null,
+      headSha: run.head_sha || null,
+      runNumber: run.run_number || null,
+      startedAt: run.run_started_at || run.created_at || null,
+      updatedAt: run.updated_at || null,
+      htmlUrl: run.html_url || null,
+    }))
+    : [];
+  const checkRuns = Array.isArray(checksResult.value?.check_runs)
+    ? checksResult.value.check_runs.slice(0, 100).map((run) => ({
+      id: run.id,
+      name: run.name || "Unnamed check",
+      status: run.status || null,
+      conclusion: run.conclusion || null,
+      startedAt: run.started_at || null,
+      completedAt: run.completed_at || null,
+      htmlUrl: run.html_url || null,
+    }))
+    : [];
+  const contexts = Array.isArray(statusResult.value?.statuses)
+    ? statusResult.value.statuses.slice(0, 100).map((status) => ({
+      context: status.context || null,
+      state: status.state || null,
+      updatedAt: status.updated_at || status.created_at || null,
+      targetUrl: status.target_url || null,
+    }))
+    : [];
+  const anyAvailable = branchResult.available || workflowResult.available || checksResult.available || statusResult.available;
+  return {
+    source: "github-public-api",
+    available: anyAvailable,
+    reason: anyAvailable ? null : branchResult.reason || workflowResult.reason || "github_status_unavailable",
+    defaultBranch,
+    headCommitSha,
+    branchProtection: {
+      available: branchResult.available,
+      protected: branchResult.available ? Boolean(branchResult.value?.protected) : null,
+      reason: branchResult.reason,
+    },
+    workflowRuns: {
+      available: workflowResult.available,
+      totalObserved: Number(workflowResult.value?.total_count || workflowRuns.length),
+      latest: workflowRuns,
+      reason: workflowResult.reason,
+    },
+    checkRuns: {
+      available: checksResult.available,
+      totalObserved: Number(checksResult.value?.total_count || checkRuns.length),
+      latest: checkRuns,
+      reason: checksResult.reason,
+    },
+    commitStatus: {
+      available: statusResult.available,
+      state: statusResult.value?.state || null,
+      contexts,
+      reason: statusResult.reason,
+    },
+  };
+}
+
 export async function loadRepositorySnapshot(input, env = {}, ctx = {}) {
   const repository = parseRepository(input);
   let metadata;
   let treePayload;
   try {
-    metadata = await githubApi(`/repos/${repository.owner}/${repository.repo}`, ctx);
+    metadata = await githubApi(`/repos/${repository.owner}/${repository.repo}`, ctx, env);
     if (metadata.private) throw new Error("Private repositories require a future authenticated lane");
-    treePayload = await githubApi(`/repos/${repository.owner}/${repository.repo}/git/trees/${encodeURIComponent(metadata.default_branch)}?recursive=1`, ctx);
+    treePayload = await githubApi(`/repos/${repository.owner}/${repository.repo}/git/trees/${encodeURIComponent(metadata.default_branch)}?recursive=1`, ctx, env);
   } catch (error) {
-    if (error?.code === "GITHUB_RATE_LIMIT") return loadArchiveSnapshot(repository, ctx);
+    if (error?.code === "GITHUB_RATE_LIMIT") {
+      const snapshot = await loadArchiveSnapshot(repository, ctx);
+      snapshot.githubStatus = unavailableGithubStatus(snapshot.repository.defaultBranch, "rate_limited");
+      return snapshot;
+    }
     throw error;
   }
   const branch = metadata.default_branch;
   const completeTree = Array.isArray(treePayload.tree) ? treePayload.tree : [];
   const tree = bounded(completeTree, MAX_TREE_ENTRIES).map(({ path, type, size, sha }) => ({ path, type, size: size || 0, sha }));
-  const files = await fetchSelectedFiles(repository, branch, tree);
+  const [files, githubStatus] = await Promise.all([
+    fetchSelectedFiles(repository, branch, tree),
+    loadGithubStatus(repository, branch, ctx, env),
+  ]);
   return {
     repository: {
       owner: repository.owner,
@@ -355,9 +477,11 @@ export async function loadRepositorySnapshot(input, env = {}, ctx = {}) {
       fork: Boolean(metadata.fork),
       pushedAt: metadata.pushed_at,
       license: metadata.license?.spdx_id || null,
+      headCommitSha: githubStatus.headCommitSha,
     },
     tree,
     files,
+    githubStatus,
     limits: {
       treeEntriesObserved: tree.length,
       treeTruncated: Boolean(treePayload.truncated) || completeTree.length > MAX_TREE_ENTRIES,

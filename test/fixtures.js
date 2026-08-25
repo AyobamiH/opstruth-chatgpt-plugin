@@ -21,6 +21,8 @@ export const repositoryTree = {
     { path: "app/page.tsx", type: "blob", size: 80, sha: "2" },
     { path: "app/api/health/route.ts", type: "blob", size: 120, sha: "3" },
     { path: "src/router.tsx", type: "blob", size: 180, sha: "4" },
+    { path: "orchestrator/src/index.ts", type: "blob", size: 280000, sha: "4b" },
+    { path: "orchestrator/src/openapi.ts", type: "blob", size: 220, sha: "4c" },
     { path: "src/config.ts", type: "blob", size: 180, sha: "5" },
     { path: "src/leak.ts", type: "blob", size: 180, sha: "6" },
     { path: "migrations/001_init.sql", type: "blob", size: 180, sha: "7" },
@@ -37,6 +39,8 @@ export const fileBodies = {
   "app/page.tsx": "export default function Page(){ return <main>Home</main> }",
   "app/api/health/route.ts": "export function GET(){ return Response.json({ok:true}) }",
   "src/router.tsx": "<Route path=\"/projects/:id\" element={<Project />} />",
+  "orchestrator/src/index.ts": `app.get("/health", healthHandler);\napp.post(\n  "/api/tasks",\n  taskHandler,\n);\nrouter.route("/api/runs/:id").delete(deleteRun);`,
+  "orchestrator/src/openapi.ts": `export const paths = { "/api/tasks": { get: {} }, "/api/runs/{id}": { delete: {} } };`,
   "src/config.ts": "export const endpoint = process.env.API_BASE_URL; const mode=import.meta.env.VITE_MODE;",
   "src/leak.ts": `const token = "${"ghp_" + "abcdefghijklmnopqrstuvwxyz123456"}";`,
   "migrations/001_init.sql": "ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;",
@@ -54,6 +58,35 @@ export function installGithubFetchMock() {
     }
     if (url.hostname === "api.github.com" && url.pathname.includes("/git/trees/")) {
       return Response.json(repositoryTree);
+    }
+    if (url.hostname === "api.github.com" && url.pathname.endsWith("/branches/main")) {
+      return Response.json({ name: "main", protected: true, commit: { sha: "commit123" } });
+    }
+    if (url.hostname === "api.github.com" && url.pathname.endsWith("/actions/runs")) {
+      return Response.json({
+        total_count: 1,
+        workflow_runs: [{
+          id: 101,
+          name: "CI",
+          event: "push",
+          status: "completed",
+          conclusion: "success",
+          head_sha: "commit123",
+          run_number: 7,
+          run_started_at: "2026-08-25T01:00:00Z",
+          updated_at: "2026-08-25T01:02:00Z",
+          html_url: "https://github.com/Example/project/actions/runs/101",
+        }],
+      });
+    }
+    if (url.hostname === "api.github.com" && url.pathname.endsWith("/commits/commit123/check-runs")) {
+      return Response.json({
+        total_count: 1,
+        check_runs: [{ id: 201, name: "verify", status: "completed", conclusion: "success", html_url: "https://github.com/Example/project/runs/201" }],
+      });
+    }
+    if (url.hostname === "api.github.com" && url.pathname.endsWith("/commits/commit123/status")) {
+      return Response.json({ state: "success", statuses: [{ context: "ci", state: "success", target_url: "https://github.com/Example/project/actions/runs/101" }] });
     }
     if (url.hostname === "raw.githubusercontent.com") {
       const parts = url.pathname.split("/").filter(Boolean);

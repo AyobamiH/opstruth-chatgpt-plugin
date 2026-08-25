@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "generatedFor": "opstruth-chatgpt-plugin@0.2.0",
+  "generatedFor": "opstruth-chatgpt-plugin@0.3.0",
   "sources": [
     {
       "repository": "https://github.com/AyobamiH/opstruth",
@@ -15,7 +15,7 @@
       "commit": "0d899bcaaf3b",
       "version": "0.2.19",
       "license": "MIT",
-      "role": "read-only audit boundaries, evidence contract and capability names",
+      "role": "read-only audit boundaries, evidence contract, capability names and runner handoff contract",
       "integration": "protocol-compatible adaptation",
       "modifiedUpstream": false
     },
@@ -42,7 +42,7 @@
       "commit": "9d35b7d3d38e",
       "version": "0.1.0-rc.5",
       "license": "Apache-2.0",
-      "role": "AgentProof signed receipt v2 compatibility",
+      "role": "AgentProof signed receipt v2 compatibility and signed-evidence trust separation",
       "integration": "independent protocol verifier",
       "modifiedUpstream": false
     },
@@ -50,7 +50,7 @@
       "repository": "https://github.com/AyobamiH/openclaw-operator",
       "commit": "15d2e8c141a5",
       "license": "not imported",
-      "role": "fixed-command tool surface and local companion boundary",
+      "role": "fixed-command tool surface, large Express application route fixture and local companion boundary",
       "integration": "architectural compatibility only",
       "modifiedUpstream": false
     }
@@ -65,7 +65,7 @@
   "deferred": [
     "Private GitHub OAuth",
     "AgentProof-authorized repository writes",
-    "OpenClaw local execution bridge",
+    "Authenticated sandbox execution behind the published runner handoff contract",
     "Provider deployment actions"
   ]
 }

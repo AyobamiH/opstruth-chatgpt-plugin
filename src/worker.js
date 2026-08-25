@@ -1,10 +1,10 @@
 import { callTool, TOOL_DEFINITIONS } from "./tools.js";
 import { evidenceResource, EVIDENCE_UI_URI } from "./ui.js";
-import { asErrorMessage, htmlResponse, jsonResponse } from "./utils.js";
+import { asErrorMessage, htmlResponse, jsonResponse, signingMetadata } from "./utils.js";
 import { landingPage, privacyPage, supportPage, termsPage } from "./pages.js";
 
-const SERVER = { name: "opstruth", version: "0.2.0" };
-const INSTRUCTIONS = "Use OpsTruth for read-only public GitHub evidence. Inspect before broad audits, prefer the narrowest matching tool, never ask for credentials, never infer build/runtime/deployment success from static files, and separate verified facts from warnings and proof gaps. Use the render tool only after a data tool returns a final report.";
+const SERVER = { name: "opstruth", version: "0.3.0" };
+const INSTRUCTIONS = "Use OpsTruth for evidence-first public GitHub and user-supplied HTTPS health checks. Inspect before broad audits, prefer the narrowest matching tool, never ask for credentials, use current public CI evidence when available, never infer build success from static files, and separate verified facts from warnings and proof gaps. Sandbox preparation is a handoff only and requires a separately connected approval-gated runner. Use the render tool only after a data tool returns a final report.";
 
 function rpcResult(id, result) {
   return { jsonrpc: "2.0", id, result };
@@ -82,7 +82,25 @@ async function fetchHandler(request, env, ctx) {
   const url = new URL(request.url);
   if (url.pathname === "/mcp") return mcpResponse(request, env, ctx);
   if (url.pathname === "/health") {
-    return jsonResponse({ status: "ok", service: SERVER.name, version: SERVER.version, tools: TOOL_DEFINITIONS.length, mode: "read-only-public-github" });
+    const signing = await signingMetadata(env);
+    return jsonResponse({
+      status: "ok",
+      service: SERVER.name,
+      version: SERVER.version,
+      tools: TOOL_DEFINITIONS.length,
+      mode: "read-only-public-evidence",
+      evidenceSigning: signing.status,
+    });
+  }
+  if (url.pathname === "/signing-key") {
+    const signing = await signingMetadata(env);
+    return jsonResponse({
+      status: signing.status,
+      configured: signing.configured,
+      algorithm: signing.algorithm,
+      signerFingerprint: signing.signerFingerprint,
+      publicKeyPem: signing.publicKeyPem,
+    }, signing.configured ? 200 : 503);
   }
   if (url.pathname === "/.well-known/openai-apps-challenge") {
     if (!env?.OPENAI_APPS_CHALLENGE) return new Response("Not configured", { status: 404 });

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadRepositorySnapshot, parseRepository } from "../src/github.js";
-import { auditSecrets, fullAudit, traceRoutes } from "../src/audits.js";
+import { auditSecrets, fullAudit, reviewApiContracts, traceRoutes } from "../src/audits.js";
 import { installGithubFetchMock, installRateLimitedGithubFetchMock } from "./fixtures.js";
 
 test("repository parser accepts only public github identifiers", () => {
@@ -16,6 +16,8 @@ test("snapshot and audits remain bounded and redact secret values", async () => 
   try {
     const snapshot = await loadRepositorySnapshot("Example/project");
     assert.equal(snapshot.repository.fullName, "Example/project");
+    assert.equal(snapshot.githubStatus.workflowRuns.latest[0].conclusion, "success");
+    assert.equal(snapshot.githubStatus.branchProtection.protected, true);
     assert.equal(snapshot.files.some((file) => file.path === ".env"), false);
 
     const secrets = auditSecrets(snapshot);
@@ -27,11 +29,20 @@ test("snapshot and audits remain bounded and redact secret values", async () => 
     const routes = traceRoutes(snapshot).routes.map((route) => route.path);
     assert.ok(routes.includes("/api/health"));
     assert.ok(routes.includes("/projects/:id"));
+    assert.ok(routes.includes("/health"));
+    assert.ok(routes.includes("/api/tasks"));
+    assert.ok(routes.includes("/api/runs/:id"));
+    assert.ok(routes.includes("/api/runs/{id}"));
+
+    const contracts = reviewApiContracts(snapshot);
+    assert.ok(contracts.apiContracts.handlers.includes("orchestrator/src/index.ts"));
 
     const audit = fullAudit(snapshot);
     assert.equal(audit.changedState.changed, false);
     assert.ok(audit.details.environment.referencedVariableNames.includes("API_BASE_URL"));
     assert.ok(audit.details.deployment.platforms.includes("Cloudflare"));
+    assert.equal(audit.details.githubHandoff.publicGithubStatus.commitStatus.state, "success");
+    assert.equal(audit.details.githubHandoff.licence.status, "consistent");
   } finally {
     restore();
   }

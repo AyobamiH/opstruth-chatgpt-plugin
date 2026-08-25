@@ -15,3 +15,10 @@ test("workflow planning stops mutating intent at an approval gate", () => {
   assert.equal(result.approvalGates.length, 1);
   assert.equal(result.approvalGates[0].availableInPublicPlugin, false);
 });
+
+test("capability discovery routes build execution to the sandbox handoff", () => {
+  const result = discoverCapabilities("run the build and test in a sandbox runner");
+  assert.equal(result.recommendation.tool, "opstruth_prepare_sandbox_verification");
+  assert.equal(result.recommendation.authority, "plan");
+  assert.equal(result.automaticAction, false);
+});
