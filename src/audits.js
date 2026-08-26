@@ -233,10 +233,12 @@ export function checkGithubHandoff(snapshot) {
   const allPaths = paths(snapshot);
   const workflows = allPaths.filter((path) => path.startsWith(".github/workflows/"));
   const licenceFiles = allPaths.filter((path) => /(?:^|\/)licen[cs]e(?:\.|$)/i.test(path));
+  const externalLicenceFiles = licenceFiles.filter((path) => /(?:^|\/)(?:node_modules|vendor|third[_-]?party|openai-cookbook|openclaw-docs|cookbook)(?:\/|$)/i.test(path));
+  const projectLicenceFiles = licenceFiles.filter((path) => !externalLicenceFiles.includes(path));
   const githubSpdx = snapshot.repository.license || null;
-  const licenceStatus = githubSpdx && licenceFiles.length ? "consistent"
+  const licenceStatus = githubSpdx && projectLicenceFiles.length ? "consistent"
     : githubSpdx ? "metadata_only"
-      : licenceFiles.length ? "tree_only" : "absent";
+      : projectLicenceFiles.length ? "tree_only" : "absent";
   const githubStatus = snapshot.githubStatus || null;
   const signals = {
     workflows,
@@ -244,9 +246,10 @@ export function checkGithubHandoff(snapshot) {
     pullRequestTemplate: allPaths.some((path) => /pull_request_template/i.test(path)),
     securityPolicy: allPaths.some((path) => /(?:^|\/)security\.md$/i.test(path)),
     licence: {
-      present: Boolean(githubSpdx || licenceFiles.length),
+      present: Boolean(githubSpdx || projectLicenceFiles.length),
       githubSpdx,
-      detectedFiles: bounded(licenceFiles, 20),
+      detectedFiles: bounded(projectLicenceFiles, 20),
+      ignoredExternalFiles: bounded(externalLicenceFiles, 20),
       status: licenceStatus,
     },
     packageScriptNames: packageScripts(snapshot),

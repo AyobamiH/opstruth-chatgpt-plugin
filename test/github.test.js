@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadRepositorySnapshot, parseRepository } from "../src/github.js";
-import { auditSecrets, fullAudit, reviewApiContracts, traceRoutes } from "../src/audits.js";
+import { auditSecrets, checkGithubHandoff, fullAudit, reviewApiContracts, traceRoutes } from "../src/audits.js";
 import { installGithubFetchMock, installRateLimitedGithubFetchMock } from "./fixtures.js";
 
 test("repository parser accepts only public github identifiers", () => {
@@ -20,6 +20,7 @@ test("snapshot and audits remain bounded and redact secret values", async () => 
     assert.equal(snapshot.githubStatus.workflowRuns.latest[0].conclusion, "success");
     assert.equal(snapshot.githubStatus.branchProtection.protected, true);
     assert.equal(snapshot.files.some((file) => file.path === ".env"), false);
+    assert.ok(snapshot.files.some((file) => file.path === "orchestrator/src/index.ts"));
 
     const secrets = auditSecrets(snapshot);
     assert.equal(secrets.secretRisk.findings.length, 1);
@@ -47,6 +48,20 @@ test("snapshot and audits remain bounded and redact secret values", async () => 
   } finally {
     restore();
   }
+});
+
+test("licence reconciliation ignores licences confined to synced external trees", () => {
+  const handoff = checkGithubHandoff({
+    repository: { license: null },
+    tree: [{ path: "openai-cookbook/LICENSE" }, { path: "package.json" }],
+    files: [],
+    githubStatus: null,
+    limits: { treeTruncated: false },
+  });
+  assert.equal(handoff.githubHandoff.licence.present, false);
+  assert.equal(handoff.githubHandoff.licence.status, "absent");
+  assert.deepEqual(handoff.githubHandoff.licence.detectedFiles, []);
+  assert.deepEqual(handoff.githubHandoff.licence.ignoredExternalFiles, ["openai-cookbook/LICENSE"]);
 });
 
 test("rate-limited GitHub API falls back to a bounded public archive", async () => {

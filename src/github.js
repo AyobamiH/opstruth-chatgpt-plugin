@@ -103,10 +103,12 @@ function priority(path) {
   const lower = path.toLowerCase();
   const base = lower.split("/").at(-1);
   let score = 10;
-  if (["package.json", "pyproject.toml", "cargo.toml", "go.mod", "wrangler.json", "wrangler.jsonc", "wrangler.toml", "vercel.json", "netlify.toml", "dockerfile", "tsconfig.json", "openapi.json", "openapi.yaml", "openapi.yml"].includes(base)) score = 100;
+  if (["package.json", "pyproject.toml", "cargo.toml", "go.mod", "pom.xml", "composer.json"].includes(base)) score = lower.includes("/") ? 88 : 100;
+  else if (["wrangler.json", "wrangler.jsonc", "wrangler.toml", "vercel.json", "netlify.toml", "dockerfile", "tsconfig.json", "openapi.json", "openapi.yaml", "openapi.yml"].includes(base)) score = 100;
   else if (lower.startsWith(".github/workflows/") || ["readme.md", "contributing.md", "security.md"].includes(base)) score = 95;
   else if (/(?:^|\/)migrations?\//.test(lower)) score = 90;
   else if (/(?:^|\/)(?:app|pages)\/.+\/(?:page|route)\.(?:js|jsx|ts|tsx)$/.test(lower)) score = 92;
+  else if (/(?:^|\/)(?:orchestrator|server|backend|api|worker)\/src\/(?:index|app|server|router|routes|api|worker|openapi)\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(lower)) score = 99;
   else if (/(?:^|\/)src\/(?:index|app|server|router|routes|api|worker)\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(lower)) score = 96;
   else if (/(?:router|routes|api|server|worker|index)\.(?:js|jsx|ts|tsx|mjs|cjs)$/.test(base)) score = 84;
   else if (/(?:^|\/)(?:src|app|pages|api|server|worker)\//.test(lower)) score = 62;
