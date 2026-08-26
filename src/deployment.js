@@ -1,4 +1,5 @@
 import { bounded } from "./utils.js";
+import { PLUGIN_VERSION } from "./version.js";
 
 const MAX_PATHS = 8;
 const MAX_REDIRECTS = 3;
@@ -44,7 +45,7 @@ async function fetchWithTimeout(url, method) {
       redirect: "manual",
       headers: {
         accept: "application/json, text/plain;q=0.9, text/html;q=0.5",
-        "user-agent": "opstruth-chatgpt-plugin/0.3.0",
+        "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}`,
       },
       signal: controller.signal,
     }));
@@ -101,18 +102,17 @@ export async function probeDeployment(args = {}) {
     target.pathname = path;
     return target.href;
   });
-  const probes = [];
-  for (const target of targets) {
+  const probes = await Promise.all(targets.map(async (target) => {
     try {
-      probes.push(await probeUrl(target));
+      return await probeUrl(target);
     } catch (error) {
-      probes.push({ requestedUrl: target, finalUrl: null, method: "HEAD", status: null, ok: false, contentType: null, redirects: [], error: error.message });
+      return { requestedUrl: target, finalUrl: null, method: "HEAD", status: null, ok: false, contentType: null, redirects: [], error: error.message };
     }
-  }
+  }));
   const passing = probes.filter((probe) => probe.ok);
   return {
     contractVersion: "1.0.0",
-    skill: { name: "deployment-health-probe", version: "0.3.0" },
+    skill: { name: "deployment-health-probe", version: PLUGIN_VERSION },
     status: passing.length === probes.length ? "healthy" : passing.length ? "partial" : "unhealthy",
     target: { origin: base.origin, paths },
     probes,

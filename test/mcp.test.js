@@ -39,10 +39,32 @@ test("MCP repository call returns structured evidence and a signed receipt when 
   }
 });
 
+test("MCP tool usage is measured without delaying the response", async () => {
+  const restore = installGithubFetchMock();
+  try {
+    const writes = [];
+    const env = { OPSTRUTH_ANALYTICS: { writeDataPoint: (point) => writes.push(point) } };
+    const request = new Request("https://example.test/mcp", { method: "POST", headers: { "user-agent": "ChatGPT/1.0" } });
+    const result = await handleRpc({
+      jsonrpc: "2.0",
+      id: 41,
+      method: "tools/call",
+      params: { name: "opstruth_inspect_repository", arguments: { repository_url: "Example/project" } },
+    }, request, env, { waitUntil: (promise) => promise });
+    assert.equal(result.result.structuredContent.repository.fullName, "Example/project");
+    assert.equal(writes.length, 1);
+    assert.deepEqual(writes[0].blobs.slice(0, 4), ["tool_call", "opstruth_inspect_repository", "success", "chatgpt"]);
+  } finally {
+    restore();
+  }
+});
+
 test("worker serves health and policy routes", async () => {
-  const health = await worker.fetch(new Request("https://example.test/health"), {}, {});
+  const health = await worker.fetch(new Request("https://example.test/health"), { OPSTRUTH_BUILD_COMMIT: "abc123" }, {});
   assert.equal(health.status, 200);
-  assert.equal((await health.json()).tools, 16);
+  const healthBody = await health.json();
+  assert.equal(healthBody.tools, 16);
+  assert.equal(healthBody.commit, "abc123");
   for (const path of ["/privacy", "/terms", "/support"]) {
     const response = await worker.fetch(new Request(`https://example.test${path}`), {}, {});
     assert.equal(response.status, 200);

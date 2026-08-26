@@ -1,6 +1,6 @@
 {
   "name": "opstruth",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Verify public GitHub repositories, CI evidence and deployment health with evidence-first checks.",
   "author": {
     "name": "AYOBAMI JOHN HAASTRUP",

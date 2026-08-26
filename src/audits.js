@@ -1,7 +1,8 @@
 import { declaredEnvironmentNames, fileContents, fileMap, paths } from "./github.js";
 import { bounded, unique } from "./utils.js";
+import { PLUGIN_VERSION } from "./version.js";
 
-const SOURCE_VERSION = "0.3.0";
+const SOURCE_VERSION = PLUGIN_VERSION;
 
 function report(snapshot, skill) {
   return {
@@ -9,6 +10,11 @@ function report(snapshot, skill) {
     skill: { name: skill, version: SOURCE_VERSION },
     repository: snapshot.repository,
     status: "complete",
+    verdict: {
+      code: "insufficient_evidence",
+      label: "Insufficient evidence",
+      summary: "This is read-only public evidence; it does not prove fresh execution, runtime correctness or deployment readiness.",
+    },
     confidence: {
       level: snapshot.limits.treeTruncated ? "medium" : "high",
       reason: snapshot.limits.treeTruncated
@@ -345,5 +351,10 @@ export function fullAudit(snapshot) {
   };
   result.evidence = unique(Object.values(sections).flatMap((section) => section.evidence).map((entry) => JSON.stringify(entry)))
     .map((entry) => JSON.parse(entry));
+  result.verdict = result.failures.length
+    ? { code: "not_ready", label: "Not ready", summary: "Blocking evidence failures remain." }
+    : result.warnings.length
+      ? { code: "insufficient_evidence", label: "Insufficient evidence", summary: "Warnings or proof gaps remain; validate them before release." }
+      : { code: "ready_for_live_validation", label: "Ready for live validation", summary: "Public evidence is internally consistent enough for the next approved validation step; it is not a production approval." };
   return result;
 }

@@ -1,4 +1,5 @@
 import { bounded, unique } from "./utils.js";
+import { PLUGIN_VERSION } from "./version.js";
 
 const MAX_TREE_ENTRIES = 20000;
 // Keep repository, status and file fetches below Cloudflare's per-invocation subrequest ceiling.
@@ -56,7 +57,7 @@ async function cachedFetch(request, ctx) {
 function githubHeaders(env = {}) {
   const headers = {
     accept: "application/vnd.github+json",
-    "user-agent": "opstruth-chatgpt-plugin/0.3.0",
+    "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}`,
     "x-github-api-version": "2022-11-28",
   };
   if (env?.GITHUB_READ_TOKEN) headers.authorization = `Bearer ${env.GITHUB_READ_TOKEN}`;
@@ -258,7 +259,7 @@ async function loadArchiveSnapshot(repository, ctx) {
   const headUrl = `https://github.com/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/archive/HEAD.tar.gz`;
   const headResponse = await fetch(new Request(headUrl, {
     redirect: "manual",
-    headers: { "user-agent": "opstruth-chatgpt-plugin/0.3.0" },
+    headers: { "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}` },
   }));
   if (headResponse.status === 404) throw new Error("Repository was not found or is not public");
 
@@ -276,7 +277,7 @@ async function loadArchiveSnapshot(repository, ctx) {
     }
   }
 
-  const request = new Request(archiveUrl, { headers: { "user-agent": "opstruth-chatgpt-plugin/0.3.0" } });
+  const request = new Request(archiveUrl, { headers: { "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}` } });
   const response = await cachedFetch(request, ctx);
   if (response.status === 404) throw new Error("Repository was not found or is not public");
   if (!response.ok) throw new Error(`GitHub archive request failed with status ${response.status}`);
@@ -328,7 +329,7 @@ async function loadArchiveSnapshot(repository, ctx) {
 async function fetchRawFile(repository, branch, entry) {
   const encodedPath = entry.path.split("/").map(encodeURIComponent).join("/");
   const url = `https://raw.githubusercontent.com/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/${encodeURIComponent(branch)}/${encodedPath}`;
-  const response = await fetch(new Request(url, { headers: { "user-agent": "opstruth-chatgpt-plugin/0.3.0" } }));
+  const response = await fetch(new Request(url, { headers: { "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}` } }));
   if (!response.ok) return null;
   const text = (await response.text()).slice(0, MAX_FILE_BYTES);
   return { path: entry.path, text, truncated: Number(entry.size || 0) > text.length };
@@ -338,8 +339,8 @@ async function fetchSelectedFiles(repository, branch, tree) {
   const selected = selectFiles(tree);
   const files = [];
   let total = 0;
-  for (let index = 0; index < selected.length; index += 5) {
-    const batch = await Promise.all(selected.slice(index, index + 5).map((entry) => fetchRawFile(repository, branch, entry)));
+  for (let index = 0; index < selected.length; index += 10) {
+    const batch = await Promise.all(selected.slice(index, index + 10).map((entry) => fetchRawFile(repository, branch, entry)));
     for (const file of batch.filter(Boolean)) {
       if (total + file.text.length > MAX_TOTAL_BYTES) return files;
       files.push(file);

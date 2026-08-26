@@ -1,6 +1,6 @@
 ---
 name: review-change-safety
-description: Review the static safety implications of visible API, migration, environment, secret and deployment changes in a public GitHub repository. Use before implementation, pull-request handoff, migrations, deployment or publication when the user needs evidence about risk boundaries.
+description: Use this before implementation, pull-request handoff, migration, deployment or publication when a user needs static safety evidence about visible API, environment, secret or deployment changes in a public GitHub repository. Do not accept credentials or perform writes.
 ---
 
 # Review Change Safety

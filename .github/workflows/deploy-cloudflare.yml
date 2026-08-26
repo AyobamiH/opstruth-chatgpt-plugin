@@ -9,6 +9,7 @@ on:
       - "scripts/generate-signing-key.mjs"
       - "wrangler.jsonc"
       - "package.json"
+      - "evals/**"
       - ".github/workflows/deploy-cloudflare.yml"
 
 permissions:
@@ -21,8 +22,8 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
       - run: npm run check
@@ -30,19 +31,28 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
-      - run: npx wrangler deploy
+      - name: Deploy bootstrap Worker with commit identity
+        run: npx --yes wrangler@4.33.1 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
       - name: Provision stable evidence-signing key once
         shell: bash
         run: |
           set -euo pipefail
           secret_list="$RUNNER_TEMP/opstruth-secret-list.json"
-          npx wrangler secret list > "$secret_list"
+          npx --yes wrangler@4.33.1 secret list > "$secret_list"
           if grep -q 'OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8' "$secret_list" && grep -q 'OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI' "$secret_list"; then
             exit 0
           fi
           private_key="$RUNNER_TEMP/opstruth-private.pem"
           public_key="$RUNNER_TEMP/opstruth-public.pem"
           node scripts/generate-signing-key.mjs "$private_key" "$public_key"
-          npx wrangler secret put OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8 < "$private_key"
-          npx wrangler secret put OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI < "$public_key"
+          npx --yes wrangler@4.33.1 secret put OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8 < "$private_key"
+          npx --yes wrangler@4.33.1 secret put OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI < "$public_key"
           rm -f "$private_key" "$public_key" "$secret_list"
+      - name: Deploy final Worker with stable commit identity
+        run: npx --yes wrangler@4.33.1 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
+      - name: Smoke test production routes
+        env:
+          OPSTRUTH_EXPECTED_VERSION: 0.3.1
+          OPSTRUTH_EXPECTED_COMMIT: ${{ github.sha }}
+          OPSTRUTH_PRODUCTION_URL: https://opstruth-chatgpt.woeinvests.workers.dev
+        run: npm run smoke:production

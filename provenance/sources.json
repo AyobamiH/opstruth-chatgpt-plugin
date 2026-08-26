@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "generatedFor": "opstruth-chatgpt-plugin@0.3.0",
+  "generatedFor": "opstruth-chatgpt-plugin@0.3.1",
   "sources": [
     {
       "repository": "https://github.com/AyobamiH/opstruth",

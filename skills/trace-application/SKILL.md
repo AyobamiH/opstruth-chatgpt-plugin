@@ -1,6 +1,6 @@
 ---
 name: trace-application
-description: Trace statically visible application routes, API surfaces, environment references and deployment entry points in a public GitHub repository. Use when the user asks how an application is wired, where requests enter, what routes exist, or what runtime claims can be supported by repository evidence.
+description: Use this when a user asks how a public GitHub application is wired, where requests enter, which routes or API surfaces exist, or which runtime claims repository evidence can support. This is static tracing only and must not be used to claim reachability, authentication or application correctness.
 ---
 
 # Trace Application

@@ -1,6 +1,6 @@
 {
   "name": "opstruth-chatgpt-plugin",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "description": "Hybrid ChatGPT and Codex plugin for evidence-first repository verification.",
@@ -8,9 +8,12 @@
     "lint": "node scripts/check-source.mjs",
     "test": "node --test",
     "validate:plugin": "node scripts/validate-plugin.mjs",
-    "check": "npm run lint && npm test && npm run validate:plugin",
-    "dev": "npx wrangler dev",
-    "deploy": "npx wrangler deploy"
+    "validate:evals": "node scripts/validate-evals.mjs",
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "check": "npm run lint && npm test && npm run validate:plugin && npm run validate:evals",
+    "dev": "npx --yes wrangler@4.33.1 dev",
+    "deploy": "npx --yes wrangler@4.33.1 deploy",
+    "analytics": "node scripts/query-analytics.mjs"
   },
   "engines": {
     "node": ">=20"

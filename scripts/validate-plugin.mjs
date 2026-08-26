@@ -8,7 +8,7 @@ const provenance = JSON.parse(await readFile(new URL("../provenance/sources.json
 const errors = [];
 
 if (manifest.name !== "opstruth") errors.push("plugin name must remain opstruth");
-if (manifest.version !== "0.3.0") errors.push("plugin version mismatch");
+if (manifest.version !== "0.3.1") errors.push("plugin version mismatch");
 if (manifest.author?.name !== "AYOBAMI JOHN HAASTRUP") errors.push("verified publisher name mismatch");
 if (manifest.skills !== "./skills/") errors.push("skills path must be relative");
 if (manifest.interface?.logo !== "./assets/logo-mark.png") errors.push("interface logo must reference the square product mark");

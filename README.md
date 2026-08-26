@@ -4,6 +4,8 @@ OpsTruth is an evidence-first repository verification plugin. It combines focuse
 
 The public release accepts public GitHub repository URLs and explicitly supplied public HTTPS deployment URLs. It does not clone repositories, execute project code, install packages, read private repositories, deploy projects or mutate target systems. Fresh execution is represented by an approval-gated handoff contract for a separately connected isolated runner.
 
+Usage analytics are privacy-safe and aggregate-only. The Worker records tool name, outcome, latency, version and a coarse client family in Cloudflare Analytics Engine. It never records prompts, repository names, URLs, IPs or user identifiers. See `docs/release-readiness.md` for owner-only queries and the limitations of estimating ChatGPT usage.
+
 ## Architecture
 
 - `skills/` teaches ChatGPT and Codex when and how to use the tools.

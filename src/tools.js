@@ -16,6 +16,7 @@ import { verifyAgentProofReceipt, verifyOpsTruthEvidenceReceipt } from "./receip
 import { prepareSandboxVerification } from "./sandbox.js";
 import { EVIDENCE_UI_URI } from "./ui.js";
 import { evidenceReceipt, textResult } from "./utils.js";
+import { PLUGIN_VERSION } from "./version.js";
 
 const REPOSITORY_INPUT = {
   type: "object",
@@ -47,19 +48,19 @@ function tool(name, title, description, inputSchema = REPOSITORY_INPUT, extra = 
 }
 
 export const TOOL_DEFINITIONS = [
-  tool("opstruth_inspect_repository", "Inspect repository", "Map a public GitHub repository before planning changes. Returns repository identity, visible structure, manifests, workflows, tests and proof gaps without executing code."),
-  tool("opstruth_audit_repository", "Audit repository", "Run the complete read-only OpsTruth audit for a public GitHub repository. Use for broad evidence and readiness questions rather than one narrow concern."),
-  tool("opstruth_trace_routes", "Trace application routes", "Find statically visible page, API and declared route patterns in a public GitHub repository. Does not claim live reachability or runtime behavior."),
-  tool("opstruth_audit_environment", "Audit environment references", "List visible environment variable names, configuration paths and package script names without reading environment values or secret files."),
-  tool("opstruth_audit_secrets", "Audit secret exposure risk", "Scan bounded public source for selected secret-like patterns. Returns only redacted pattern types and locations, never matched values."),
-  tool("opstruth_review_api_contracts", "Review API contracts", "Inventory visible API handlers, OpenAPI, GraphQL, schema and contract paths. Does not call or validate deployed APIs."),
-  tool("opstruth_review_migrations", "Review migrations", "Inventory visible migration files and selected static risk indicators without connecting to or changing a database."),
-  tool("opstruth_check_github_handoff", "Check GitHub handoff", "Check current public GitHub Actions, check-run, commit-status and branch-protection evidence alongside visible workflows and handoff files without changing GitHub."),
-  tool("opstruth_check_deployment", "Check deployment readiness", "Inspect visible deployment configuration, platform indicators and package script names without building, deploying or calling provider APIs."),
+  tool("opstruth_inspect_repository", "Inspect repository", "Use this when you need a quick evidence map of a public GitHub repository before planning changes. It returns identity, structure, manifests, workflows, tests and proof gaps without executing code. Do not use it to inspect private repositories or claim a build passed."),
+  tool("opstruth_audit_repository", "Audit repository", "Use this for a broad, read-only evidence audit of a public GitHub repository, including readiness questions. Prefer a narrower tool for one concern. Never use it to modify, deploy or execute the repository."),
+  tool("opstruth_trace_routes", "Trace application routes", "Use this when you need statically visible page, API or declared route patterns in a public GitHub repository. It cannot prove live reachability, authentication, middleware behaviour or runtime correctness."),
+  tool("opstruth_audit_environment", "Audit environment references", "Use this to list visible environment variable names, configuration paths and package scripts. Environment values and secret-file contents are never read; do not request credentials through this tool."),
+  tool("opstruth_audit_secrets", "Audit secret exposure risk", "Use this for a bounded public-source scan of selected secret-like patterns. It returns only redacted types and locations, never values. It is not a complete history or credential-validity scan."),
+  tool("opstruth_review_api_contracts", "Review API contracts", "Use this to inventory visible API handlers and OpenAPI, GraphQL, schema or contract paths. It does not call, mutate or validate a deployed API and cannot prove consumer compatibility."),
+  tool("opstruth_review_migrations", "Review migrations", "Use this to review visible migration files and static risk indicators before a database change. It never connects to or changes a database and cannot prove applied state or rollback safety."),
+  tool("opstruth_check_github_handoff", "Check GitHub handoff", "Use this when release confidence depends on current public GitHub Actions, check runs, commit status, branch protection or handoff files. It is read-only and cannot approve, merge, push or change GitHub."),
+  tool("opstruth_check_deployment", "Check deployment readiness", "Use this for a static deployment preflight based on visible configuration and package scripts. It does not build, deploy, call provider APIs or prove live health."),
   tool(
     "opstruth_probe_deployment",
     "Probe deployment health",
-    "Probe explicitly supplied public HTTPS health paths with bounded HEAD requests and a GET fallback when HEAD is unsupported or unsuccessful. Returns status and headers without retaining response bodies.",
+    "Use this only when the user supplies a public HTTPS deployment URL and asks for a bounded health check. It retains status and headers but no response body; it rejects credentials, localhost, IP literals and non-HTTPS URLs. It does not deploy or diagnose private provider state.",
     {
       type: "object",
       additionalProperties: false,
@@ -78,7 +79,7 @@ export const TOOL_DEFINITIONS = [
   tool(
     "opstruth_prepare_sandbox_verification",
     "Prepare sandbox verification",
-    "Prepare an approval-gated handoff for a separately connected isolated runner using only visible repository-declared package scripts. This public tool never executes code.",
+    "Use this when the user needs a plan to verify a repository build or tests in a separately connected isolated runner. It only prepares an approval-gated handoff from declared scripts and never executes code, installs dependencies or accepts credentials.",
     {
       type: "object",
       additionalProperties: false,
@@ -92,7 +93,7 @@ export const TOOL_DEFINITIONS = [
   tool(
     "opstruth_discover_capabilities",
     "Discover existing capabilities",
-    "Recommend the lowest-authority OpsTruth capability for a concrete coding outcome. This returns a recommendation only and does not invoke another tool.",
+    "Use this when you are unsure which read-only OpsTruth capability fits a concrete coding outcome. It recommends one bounded capability only and does not invoke tools, modify repositories or authorise actions.",
     {
       type: "object",
       additionalProperties: false,
@@ -103,7 +104,7 @@ export const TOOL_DEFINITIONS = [
   tool(
     "opstruth_plan_workflow",
     "Plan verification workflow",
-    "Create a bounded verification sequence with checkpoints and approval gates for a coding objective. This plans but does not execute or authorize actions.",
+    "Use this to create a bounded verification sequence with checkpoints and approval gates for a coding objective. It plans only; it does not execute, approve, deploy, merge or authorise actions.",
     {
       type: "object",
       additionalProperties: false,
@@ -117,7 +118,7 @@ export const TOOL_DEFINITIONS = [
   tool(
     "opstruth_verify_receipt",
     "Verify AgentProof receipt",
-    "Verify an AgentProof signed receipt v2 structure, payload digest, Ed25519 signature and optional signer trust without executing or repeating the action.",
+    "Use this when an AgentProof signed receipt v2 is supplied and its structure, digest, signature or signer trust needs checking. It never executes or repeats the underlying action and does not infer that a valid receipt proves the action was safe.",
     {
       type: "object",
       additionalProperties: false,
@@ -135,7 +136,7 @@ export const TOOL_DEFINITIONS = [
   tool(
     "opstruth_verify_evidence_receipt",
     "Verify OpsTruth evidence receipt",
-    "Verify an OpsTruth evidence report digest, Ed25519 signature and optional signer trust without repeating the repository inspection or deployment probe.",
+    "Use this when an OpsTruth evidence report receipt is supplied and its digest, Ed25519 signature or signer trust needs independent checking. It never repeats the inspection or probe and does not turn evidence into a deployment approval.",
     {
       type: "object",
       additionalProperties: false,
@@ -153,7 +154,7 @@ export const TOOL_DEFINITIONS = [
   tool(
     "opstruth_render_evidence",
     "Render evidence report",
-    "Render a previously returned OpsTruth report as an interactive evidence summary. Always obtain the report from another OpsTruth data tool first.",
+    "Use this only after another OpsTruth data tool returned a report that should be presented as an interactive evidence summary. It does not fetch new evidence, execute code or change the supplied report.",
     {
       type: "object",
       additionalProperties: false,
@@ -208,7 +209,7 @@ export async function callTool(name, args = {}, env = {}, ctx = {}) {
     const report = await withReceipt({
       ...discoverCapabilities(args.objective),
       changedState: { changed: false, summary: "Recommendation only." },
-      provenance: ["capability-intelligence@6ca93fb", "opstruth-chatgpt-plugin@0.3.0"],
+      provenance: ["capability-intelligence@6ca93fb", `opstruth-chatgpt-plugin@${PLUGIN_VERSION}`],
     }, env);
     return textResult(report, `OpsTruth capability recommendation: ${report.recommendation?.tool || report.status}. No capability was invoked.`);
   }
@@ -216,7 +217,7 @@ export async function callTool(name, args = {}, env = {}, ctx = {}) {
     const report = await withReceipt({
       ...planWorkflow(args.objective, args.repository_url || null),
       changedState: { changed: false, summary: "Planning only." },
-      provenance: ["autonomous-coding-workflow-library@0dca8cc", "opstruth-chatgpt-plugin@0.3.0"],
+      provenance: ["autonomous-coding-workflow-library@0dca8cc", `opstruth-chatgpt-plugin@${PLUGIN_VERSION}`],
     }, env);
     return textResult(report, `OpsTruth planned ${report.stages.length} verification stage(s). No stage was executed.`);
   }

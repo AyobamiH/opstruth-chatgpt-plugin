@@ -1,7 +1,29 @@
 # Release readiness evidence
 
 Date: 2026-08-25
-Candidate: OpsTruth hybrid plugin 0.3.0
+Candidate: OpsTruth hybrid plugin 0.3.1
+
+## 0.3.1 hardening additions
+
+- Privacy-safe Cloudflare Analytics Engine events record aggregate tool, outcome, latency, version and coarse client family only. Prompts, repository names, URLs, IPs and user identifiers are never persisted.
+- `/health` exposes the deployed commit identity and whether the analytics binding is configured.
+- Production deployment performs a post-deploy smoke test for health, policy and MCP initialization routes.
+- GitHub Actions references are pinned to immutable commit SHAs and Wrangler is invoked at exact version `4.33.1`.
+- Five positive and three negative golden discovery prompts are validated in CI.
+- Tool and skill descriptions state both positive triggers and disallowed use cases.
+- Every evidence report uses the same verdict vocabulary: `Ready for live validation`, `Insufficient evidence` or `Not ready`. None is a production approval.
+
+## Analytics
+
+The `OPSTRUTH_ANALYTICS` binding writes one non-blocking data point per MCP tool call to the `opstruth_usage` Analytics Engine dataset. The dataset is created on its first write. Query it from an owner-controlled shell with an Account Analytics:Read token:
+
+```sh
+export CLOUDFLARE_ACCOUNT_ID=...
+export CLOUDFLARE_ANALYTICS_READ_TOKEN=...
+OPSTRUTH_ANALYTICS_DAYS=7 npm run analytics
+```
+
+The report measures tool calls and coarse client families, not unique ChatGPT users. An unauthenticated public MCP endpoint has no privacy-safe stable user identifier, so exact user counts are intentionally unavailable. Use Cloudflare Workers Observability for request-level latency and errors alongside the tool-level dataset.
 
 ## Verified locally
 

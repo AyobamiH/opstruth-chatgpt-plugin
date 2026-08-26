@@ -2,8 +2,10 @@ import { callTool, TOOL_DEFINITIONS } from "./tools.js";
 import { evidenceResource, EVIDENCE_UI_URI } from "./ui.js";
 import { asErrorMessage, htmlResponse, jsonResponse, signingMetadata } from "./utils.js";
 import { landingPage, privacyPage, supportPage, termsPage } from "./pages.js";
+import { recordToolEvent } from "./analytics.js";
+import { PLUGIN_VERSION } from "./version.js";
 
-const SERVER = { name: "opstruth", version: "0.3.0" };
+const SERVER = { name: "opstruth", version: PLUGIN_VERSION };
 const INSTRUCTIONS = "Use OpsTruth for evidence-first public GitHub and user-supplied HTTPS health checks. Inspect before broad audits, prefer the narrowest matching tool, never ask for credentials, use current public CI evidence when available, never infer build success from static files, and separate verified facts from warnings and proof gaps. Sandbox preparation is a handoff only and requires a separately connected approval-gated runner. Use the render tool only after a data tool returns a final report.";
 
 function rpcResult(id, result) {
@@ -38,9 +40,13 @@ async function handleRpc(payload, request, env, ctx) {
   }
   if (method === "tools/call") {
     if (!params.name || typeof params.name !== "string") return rpcError(id, -32602, "Tool name required");
+    const started = Date.now();
     try {
-      return rpcResult(id, await callTool(params.name, params.arguments || {}, env, ctx));
+      const response = rpcResult(id, await callTool(params.name, params.arguments || {}, env, ctx));
+      recordToolEvent(env, ctx, request, { tool: params.name, outcome: "success", status: 200, latencyMs: Date.now() - started });
+      return response;
     } catch (error) {
+      recordToolEvent(env, ctx, request, { tool: params.name, outcome: "error", status: 200, latencyMs: Date.now() - started });
       return rpcResult(id, {
         isError: true,
         content: [{ type: "text", text: `OpsTruth could not complete the read-only check: ${asErrorMessage(error)}` }],
@@ -87,9 +93,11 @@ async function fetchHandler(request, env, ctx) {
       status: "ok",
       service: SERVER.name,
       version: SERVER.version,
+      commit: env?.OPSTRUTH_BUILD_COMMIT || null,
       tools: TOOL_DEFINITIONS.length,
       mode: "read-only-public-evidence",
       evidenceSigning: signing.status,
+      analytics: env?.OPSTRUTH_ANALYTICS ? "configured" : "not_configured",
     });
   }
   if (url.pathname === "/signing-key") {

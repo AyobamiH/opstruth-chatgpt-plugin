@@ -1,6 +1,6 @@
 ---
 name: audit-repository
-description: Audit a public GitHub repository with live read-only OpsTruth evidence. Use when the user wants a repository map, broad readiness audit, environment review, secret-risk scan, API or migration review, or an evidence-backed understanding before changing code.
+description: Use this when a user needs live, read-only evidence about a public GitHub repository, from a quick map to a broad readiness audit, environment review, secret-risk scan, API review or migration review. Do not use it for private repositories, credentials, code execution or write actions.
 ---
 
 # Audit Repository

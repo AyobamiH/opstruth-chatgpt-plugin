@@ -1,5 +1,6 @@
 import { fileMap, paths } from "./github.js";
 import { sha256, stableJson, unique } from "./utils.js";
+import { PLUGIN_VERSION } from "./version.js";
 
 function packageScripts(snapshot) {
   const text = fileMap(snapshot).get("package.json");
@@ -69,7 +70,7 @@ export async function prepareSandboxVerification(snapshot, objective = null) {
   };
   return {
     contractVersion: "1.0.0",
-    skill: { name: "sandbox-verification-handoff", version: "0.3.0" },
+    skill: { name: "sandbox-verification-handoff", version: PLUGIN_VERSION },
     status: commands.length ? "ready_for_approval" : "insufficient_declared_commands",
     plan: { ...plan, digest: await sha256(stableJson(plan)) },
     verified: commands.length ? ["Repository-declared verification script names", "Immutable repository identity for runner handoff"] : ["Immutable repository identity for runner handoff"],

@@ -6,5 +6,8 @@
   "workers_dev": true,
   "observability": {
     "enabled": true
-  }
+  },
+  "analytics_engine_datasets": [
+    { "binding": "OPSTRUTH_ANALYTICS", "dataset": "opstruth_usage" }
+  ]
 }

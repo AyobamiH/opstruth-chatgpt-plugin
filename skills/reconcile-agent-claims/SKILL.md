@@ -1,6 +1,6 @@
 ---
 name: reconcile-agent-claims
-description: Compare AI or agent claims about a public repository with live repository evidence and route the request to the lowest-authority available verification capability. Use when a user asks whether an agent really finished, whether claims drift from evidence, or which existing OpsTruth capability should run next.
+description: Use this when a user asks whether an AI or agent really finished a public-repository task, whether claims drift from live evidence, or which lowest-authority verification capability should run next. Do not treat static files, signatures or one health response as proof of execution or correctness.
 ---
 
 # Reconcile Agent Claims

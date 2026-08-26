@@ -1,6 +1,6 @@
 ---
 name: verify-release-readiness
-description: Assess whether a public GitHub repository has visible evidence for release or deployment handoff without deploying it. Use for release readiness, CI readiness, GitHub handoff, deployment preflight, packaging evidence or questions about whether AI-generated work is ready to publish.
+description: Use this when a user asks whether a public GitHub repository has visible CI, deployment, packaging or handoff evidence for a release. It never deploys or publishes; conclude only with Ready for live validation, Insufficient evidence or Not ready.
 ---
 
 # Verify Release Readiness

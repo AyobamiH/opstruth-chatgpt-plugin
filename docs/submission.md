@@ -1,13 +1,21 @@
 # OpenAI submission record
 
 - Product: OpsTruth
-- Version: 0.3.0
+- Version: 0.3.1
 - Publisher: AYOBAMI JOHN HAASTRUP
 - Submission shape: Skills and MCP server with optional UI
 - MCP URL: https://opstruth-chatgpt.woeinvests.workers.dev/mcp
 - Authentication: None
 - Data scope: Public GitHub repositories and explicitly supplied public HTTPS health endpoints
 - Writes: None
+
+## Discovery evaluation
+
+The checked-in `evals/golden-prompts.json` contains five direct or indirect positive cases and three negative cases. Run `npm run validate:evals` before submitting. Review tool-call analytics weekly and replay these prompts after each metadata change.
+
+## Usage analytics and privacy
+
+Cloudflare Analytics Engine records aggregate tool calls, outcomes, latency, plugin version and a coarse `chatgpt`, `codex` or `mcp` client family. It does not record prompt text, repository names, URLs, IP addresses, raw headers or user identifiers. Because the public MCP lane is unauthenticated, analytics cannot provide exact unique ChatGPT-user counts; it measures invocations and client-family signals.
 
 ## Positive tests
 

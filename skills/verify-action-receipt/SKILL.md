@@ -1,6 +1,6 @@
 ---
 name: verify-action-receipt
-description: Verify the structure, digest, signature and optional signer trust of AgentProof signed receipts v2 and OpsTruth evidence receipts without executing, repeating or trusting the underlying action. Use when the user supplies either receipt type or asks whether evidence has a cryptographically valid signature.
+description: Use this when a user supplies an AgentProof v2 or OpsTruth evidence receipt and needs its structure, digest, signature or signer trust checked. Never execute, repeat or trust the underlying action merely because its receipt is cryptographically valid.
 ---
 
 # Verify Action Receipt
