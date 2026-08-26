@@ -16,7 +16,7 @@ test("snapshot and audits remain bounded and redact secret values", async () => 
   try {
     const snapshot = await loadRepositorySnapshot("Example/project");
     assert.equal(snapshot.repository.fullName, "Example/project");
-    assert.equal(snapshot.limits.maxFiles, 38);
+    assert.equal(snapshot.limits.maxFiles, 30);
     assert.equal(snapshot.githubStatus.workflowRuns.latest[0].conclusion, "success");
     assert.equal(snapshot.githubStatus.branchProtection.protected, true);
     assert.equal(snapshot.files.some((file) => file.path === ".env"), false);

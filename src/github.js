@@ -2,7 +2,7 @@ import { bounded, unique } from "./utils.js";
 
 const MAX_TREE_ENTRIES = 20000;
 // Keep repository, status and file fetches below Cloudflare's per-invocation subrequest ceiling.
-const MAX_FILES = 38;
+const MAX_FILES = 30;
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
 const MAX_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;

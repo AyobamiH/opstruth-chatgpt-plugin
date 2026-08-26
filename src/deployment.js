@@ -61,7 +61,9 @@ async function probeUrl(initialUrl) {
 
   for (let count = 0; count <= MAX_REDIRECTS; count += 1) {
     let response = await fetchWithTimeout(current.href, method);
-    if ((response.status === 405 || response.status === 501) && method === "HEAD") {
+    const isRedirect = response.status >= 300 && response.status < 400 && response.headers.get("location");
+    if (method === "HEAD" && !response.ok && !isRedirect) {
+      try { await response.body?.cancel(); } catch { /* body was already closed */ }
       method = "GET";
       response = await fetchWithTimeout(current.href, method);
     }

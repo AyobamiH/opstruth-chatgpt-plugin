@@ -59,7 +59,7 @@ export const TOOL_DEFINITIONS = [
   tool(
     "opstruth_probe_deployment",
     "Probe deployment health",
-    "Probe explicitly supplied public HTTPS health paths with bounded HEAD requests and a GET fallback only when HEAD is unsupported. Returns status and headers without retaining response bodies.",
+    "Probe explicitly supplied public HTTPS health paths with bounded HEAD requests and a GET fallback when HEAD is unsupported or unsuccessful. Returns status and headers without retaining response bodies.",
     {
       type: "object",
       additionalProperties: false,

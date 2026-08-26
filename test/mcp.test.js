@@ -76,6 +76,32 @@ test("deployment probing validates public HTTPS targets and retains no body", as
   }
 });
 
+test("deployment probing falls back to GET after an unsuccessful HEAD", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async (request) => {
+    const method = typeof request === "string" ? "GET" : request.method;
+    return method === "HEAD"
+      ? new Response(null, { status: 404, headers: { "content-type": "text/plain" } })
+      : new Response("healthy but deliberately discarded", { status: 200, headers: { "content-type": "application/json" } });
+  };
+  try {
+    const request = new Request("https://example.test/mcp", { method: "POST" });
+    const result = await handleRpc({
+      jsonrpc: "2.0",
+      id: 71,
+      method: "tools/call",
+      params: { name: "opstruth_probe_deployment", arguments: { deployment_url: "https://service.example", health_paths: ["/health"] } },
+    }, request, {}, {});
+    const report = result.result.structuredContent;
+    assert.equal(report.status, "healthy");
+    assert.equal(report.probes[0].method, "GET");
+    assert.equal(report.probes[0].status, 200);
+    assert.equal(JSON.stringify(report).includes("healthy but deliberately discarded"), false);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("deployment probing rejects localhost and IP targets", async () => {
   const request = new Request("https://example.test/mcp", { method: "POST" });
   for (const deployment_url of ["https://localhost/health", "https://127.0.0.1/health"]) {
