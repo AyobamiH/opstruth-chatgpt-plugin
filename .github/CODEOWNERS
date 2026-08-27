@@ -1,0 +1,19 @@
+* @AyobamiH
+
+AGENTS.md @AyobamiH
+SECURITY.md @AyobamiH
+contracts/ @AyobamiH
+docs/architecture/ @AyobamiH
+docs/adr/ @AyobamiH
+.github/CODEOWNERS @AyobamiH
+.github/maintainer/ @AyobamiH
+.github/workflows/ @AyobamiH
+scripts/generate-signing-key.mjs @AyobamiH
+scripts/check-boundaries.mjs @AyobamiH
+scripts/maintainer-review.mjs @AyobamiH
+scripts/validate-contracts.mjs @AyobamiH
+test/architecture-boundary.test.js @AyobamiH
+test/contracts.test.js @AyobamiH
+test/maintainer-review.test.js @AyobamiH
+package.json @AyobamiH
+wrangler.jsonc @AyobamiH

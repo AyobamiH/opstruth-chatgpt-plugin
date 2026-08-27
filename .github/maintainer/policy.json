@@ -1,0 +1,56 @@
+{
+  "schema": "opstruth.maintainer-policy",
+  "schemaVersion": "1.0.0",
+  "botVersion": "0",
+  "authority": {
+    "contents": "read",
+    "pullRequests": "metadata-only",
+    "comments": "none",
+    "labels": "none",
+    "merge": "none"
+  },
+  "protectedFiles": [
+    "AGENTS.md",
+    "SECURITY.md",
+    "package.json",
+    "wrangler.jsonc",
+    ".github/CODEOWNERS",
+    ".github/maintainer/policy.json"
+  ],
+  "protectedPrefixes": [
+    ".github/workflows/",
+    "contracts/",
+    "docs/architecture/",
+    "docs/adr/",
+    "scripts/check-boundaries.mjs",
+    "scripts/generate-signing-key.mjs",
+    "scripts/maintainer-review.mjs",
+    "scripts/validate-contracts.mjs",
+    "test/architecture-boundary.test.js",
+    "test/contracts.test.js",
+    "test/maintainer-review.test.js"
+  ],
+  "authoritySensitivePrefixes": [
+    "src/tools.js",
+    "src/github.js",
+    "src/deployment.js",
+    "src/receipt.js",
+    "src/sandbox.js",
+    "src/worker.js",
+    "skills/",
+    ".github/",
+    "contracts/"
+  ],
+  "minorImpactPrefixes": [
+    "src/tools.js",
+    "skills/",
+    "contracts/"
+  ],
+  "patchImpactPrefixes": [
+    "src/",
+    "test/",
+    "scripts/",
+    "evals/",
+    "worker-ui/"
+  ]
+}

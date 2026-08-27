@@ -14,6 +14,19 @@ Usage analytics are privacy-safe and aggregate-only. The Worker records tool nam
 - `worker-ui/` documents the embedded evidence view.
 - `test/` verifies protocol, safety and audit behavior.
 
+OpsTruth deliberately separates observation from mutation. Private systems may later be inspected through brokered least-privilege read access. Repository writes, remediation, deployment, and other target mutation belong to separately authorised executors. OpsTruth then independently verifies the resulting state.
+
+The permanent architecture and 0.4.0 direction are defined in:
+
+- `docs/architecture/BOUNDARIES.md`: authority constitution and non-mutation invariant;
+- `docs/architecture/EVIDENCE-GRAPH.md`: subject-bound evidence, portable snapshots, deltas, and contradictions;
+- `docs/architecture/EXECUTION-PLANE.md`: protocol boundary for future authorised executors;
+- `docs/roadmap/0.4.0.md`: Evidence Graph release plan and mandatory gates;
+- `docs/maintainers/BOT.md`: staged, repository-scoped maintainer automation;
+- `contracts/`: candidate v1 ActionRequest, ActionAuthorization, ExecutionReceipt, and VerificationResult schemas.
+
+An ActionRequest grants no authority. An ExecutionReceipt is a signed claim, not proof that the requested outcome occurred. Post-execution success requires fresh, independent, subject-bound verification.
+
 ## Tool surface
 
 - `opstruth_inspect_repository`
@@ -38,6 +51,8 @@ Usage analytics are privacy-safe and aggregate-only. The Worker records tool nam
 ```bash
 npm run check
 ```
+
+`npm run check` includes source safety, architecture-boundary enforcement, tests, contract examples, plugin validation, and eval validation.
 
 ## Production
 

@@ -1,0 +1,53 @@
+{
+  "schema": "opstruth.action-request",
+  "schemaVersion": "1.0.0",
+  "requestId": "urn:uuid:11111111-1111-4111-8111-111111111111",
+  "createdAt": "2026-08-27T12:00:00Z",
+  "expiresAt": "2026-08-27T13:00:00Z",
+  "issuer": {
+    "id": "urn:opstruth:service:public-verifier",
+    "type": "service"
+  },
+  "subject": {
+    "provider": "github",
+    "repositoryId": "123456789",
+    "repositoryName": "Example/project",
+    "baselineCommitSha": "1111111111111111111111111111111111111111",
+    "environment": "production"
+  },
+  "findingRefs": [
+    {
+      "id": "urn:opstruth:finding:missing-route",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  ],
+  "requestedOutcome": {
+    "description": "Add the declared health route and prove it is deployed from the requested commit.",
+    "assertions": [
+      {
+        "assertionId": "route.health.exists",
+        "description": "The health route exists in source and returns an allowed status from the bound deployment.",
+        "predicate": "status_in",
+        "expected": [200, 204],
+        "evidenceRequirements": ["commit", "deployment", "runtime_observation"]
+      }
+    ]
+  },
+  "permittedOperations": ["modify_source", "run_declared_checks", "create_commit", "push_branch", "open_pull_request", "deploy"],
+  "forbiddenOperations": ["update_configuration", "rotate_secret"],
+  "constraints": {
+    "allowedPaths": ["src/**", "test/**"],
+    "deniedPaths": [".github/**", "wrangler.jsonc"],
+    "allowedEnvironments": ["production"],
+    "networkPolicy": "dependency_acquisition_only",
+    "maxDurationSeconds": 1800,
+    "maxOperations": 20
+  },
+  "approvalRequirement": {
+    "required": true,
+    "minimumApprovals": 1,
+    "allowedApproverIds": ["urn:opstruth:human:repository-owner"]
+  },
+  "idempotencyKey": "request.11111111-1111-4111-8111-111111111111",
+  "digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+}

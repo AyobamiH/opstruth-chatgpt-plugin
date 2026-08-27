@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opstruth:schema:action-authorization:1.0.0",
+  "title": "OpsTruth ActionAuthorization v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "authorizationId",
+    "requestDigest",
+    "decision",
+    "issuedAt",
+    "expiresAt",
+    "nonce",
+    "approver",
+    "grantedOperations",
+    "constraintsDigest",
+    "digest",
+    "proof"
+  ],
+  "properties": {
+    "schema": { "const": "opstruth.action-authorization" },
+    "schemaVersion": { "const": "1.0.0" },
+    "authorizationId": { "$ref": "#/$defs/urn" },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "decision": { "enum": ["APPROVED", "DENIED"] },
+    "issuedAt": { "$ref": "#/$defs/timestamp" },
+    "expiresAt": { "$ref": "#/$defs/timestamp" },
+    "nonce": { "type": "string", "minLength": 16, "maxLength": 200, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "approver": { "$ref": "#/$defs/identity" },
+    "grantedOperations": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/operationType" }
+    },
+    "constraintsDigest": { "$ref": "#/$defs/digest" },
+    "digest": { "$ref": "#/$defs/digest" },
+    "proof": { "$ref": "#/$defs/proof" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["decision"],
+        "properties": { "decision": { "const": "APPROVED" } }
+      },
+      "then": { "properties": { "grantedOperations": { "minItems": 1 } } },
+      "else": { "properties": { "grantedOperations": { "maxItems": 0 } } }
+    }
+  ],
+  "$defs": {
+    "urn": { "type": "string", "minLength": 8, "maxLength": 300, "pattern": "^urn:[A-Za-z0-9][A-Za-z0-9:._-]+$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/urn" },
+        "type": { "enum": ["human", "policy"] }
+      }
+    },
+    "operationType": {
+      "enum": ["modify_source", "run_declared_checks", "create_commit", "push_branch", "open_pull_request", "deploy", "rollback", "update_configuration", "rotate_secret"]
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "signerFingerprint", "publicKeyPem", "signatureBase64"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "signerFingerprint": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "publicKeyPem": { "type": "string", "minLength": 80, "maxLength": 1000 },
+        "signatureBase64": { "type": "string", "minLength": 80, "maxLength": 200, "pattern": "^[A-Za-z0-9+/]+={0,2}$" }
+      }
+    }
+  }
+}
