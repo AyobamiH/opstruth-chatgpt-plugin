@@ -1,0 +1,59 @@
+{
+  "schema": "opstruth.execution-receipt",
+  "schemaVersion": "1.0.0",
+  "receiptId": "urn:uuid:33333333-3333-4333-8333-333333333333",
+  "requestDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "authorizationDigest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "idempotencyKey": "request.11111111-1111-4111-8111-111111111111",
+  "consumedAuthorizationNonce": "nonce.22222222-2222-4222-8222-222222222222",
+  "executor": {
+    "id": "urn:opstruth:runner:isolated-example",
+    "type": "runner"
+  },
+  "startedAt": "2026-08-27T12:06:00Z",
+  "completedAt": "2026-08-27T12:11:00Z",
+  "executionState": "SUCCEEDED",
+  "operations": [
+    {
+      "operationId": "operation.1",
+      "sequence": 1,
+      "type": "modify_source",
+      "target": "urn:github:repository:123456789:path:src.worker.js",
+      "state": "SUCCEEDED",
+      "beforeDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+      "afterDigest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "evidenceRefs": [
+        {
+          "id": "urn:opstruth:evidence:patch-1",
+          "digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888"
+        }
+      ]
+    }
+  ],
+  "affectedResources": [
+    {
+      "id": "urn:github:commit:2222222222222222222222222222222222222222",
+      "type": "commit",
+      "digest": "sha256:9999999999999999999999999999999999999999999999999999999999999999"
+    }
+  ],
+  "artifacts": [],
+  "claims": [
+    {
+      "assertionId": "route.health.exists",
+      "outcome": "SATISFIED",
+      "observedValue": true,
+      "evidenceRefs": []
+    }
+  ],
+  "changedState": true,
+  "errors": [],
+  "warnings": [],
+  "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "proof": {
+    "algorithm": "Ed25519",
+    "signerFingerprint": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA0000000000000000000000000000000000000000000=\n-----END PUBLIC KEY-----",
+    "signatureBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  }
+}

@@ -6,11 +6,14 @@
   "description": "Hybrid ChatGPT and Codex plugin for evidence-first repository verification.",
   "scripts": {
     "lint": "node scripts/check-source.mjs",
+    "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "node --test",
+    "validate:contracts": "node scripts/validate-contracts.mjs",
     "validate:plugin": "node scripts/validate-plugin.mjs",
     "validate:evals": "node scripts/validate-evals.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
-    "check": "npm run lint && npm test && npm run validate:plugin && npm run validate:evals",
+    "maintainer:review": "node scripts/maintainer-review.mjs",
+    "check": "npm run lint && npm run check:boundaries && npm test && npm run validate:contracts && npm run validate:plugin && npm run validate:evals",
     "dev": "npx --yes wrangler@4.33.1 dev",
     "deploy": "npx --yes wrangler@4.33.1 deploy",
     "analytics": "node scripts/query-analytics.mjs"

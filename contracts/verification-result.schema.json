@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opstruth:schema:verification-result:1.0.0",
+  "title": "OpsTruth VerificationResult v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "resultId",
+    "requestDigest",
+    "authorizationDigest",
+    "receiptDigest",
+    "evidenceGraphDigest",
+    "observedAt",
+    "verifier",
+    "subject",
+    "verdict",
+    "assertionResults",
+    "notVerified",
+    "errors",
+    "warnings",
+    "digest",
+    "proof"
+  ],
+  "properties": {
+    "schema": { "const": "opstruth.verification-result" },
+    "schemaVersion": { "const": "1.0.0" },
+    "resultId": { "$ref": "#/$defs/urn" },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "authorizationDigest": { "$ref": "#/$defs/digest" },
+    "receiptDigest": { "$ref": "#/$defs/digest" },
+    "evidenceGraphDigest": { "$ref": "#/$defs/digest" },
+    "observedAt": { "$ref": "#/$defs/timestamp" },
+    "verifier": { "$ref": "#/$defs/identity" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "verdict": { "$ref": "#/$defs/verdict" },
+    "assertionResults": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/assertionResult" }
+    },
+    "notVerified": { "type": "array", "maxItems": 100, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+    "errors": { "$ref": "#/$defs/messages" },
+    "warnings": { "$ref": "#/$defs/messages" },
+    "digest": { "$ref": "#/$defs/digest" },
+    "proof": { "$ref": "#/$defs/proof" }
+  },
+  "$defs": {
+    "urn": { "type": "string", "minLength": 8, "maxLength": 300, "pattern": "^urn:[A-Za-z0-9][A-Za-z0-9:._-]+$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "verdict": { "enum": ["VERIFIED", "PARTIAL", "CONTRADICTED", "UNPROVEN"] },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/urn" },
+        "type": { "const": "verifier" }
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "repositoryId", "baselineCommitSha", "observedCommitSha"],
+      "properties": {
+        "provider": { "enum": ["github"] },
+        "repositoryId": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "repositoryName": { "type": "string", "minLength": 3, "maxLength": 240 },
+        "baselineCommitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "observedCommitSha": { "oneOf": [{ "type": "string", "pattern": "^[a-f0-9]{40}$" }, { "type": "null" }] },
+        "environment": { "type": "string", "minLength": 1, "maxLength": 100 }
+      }
+    },
+    "assertionResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assertionId", "verdict", "expected", "observed", "evidenceNodeIds", "explanation"],
+      "properties": {
+        "assertionId": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "expected": true,
+        "observed": true,
+        "evidenceNodeIds": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/urn" } },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "messages": { "type": "array", "maxItems": 100, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "signerFingerprint", "publicKeyPem", "signatureBase64"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "signerFingerprint": { "$ref": "#/$defs/digest" },
+        "publicKeyPem": { "type": "string", "minLength": 80, "maxLength": 1000 },
+        "signatureBase64": { "type": "string", "minLength": 80, "maxLength": 200, "pattern": "^[A-Za-z0-9+/]+={0,2}$" }
+      }
+    }
+  }
+}

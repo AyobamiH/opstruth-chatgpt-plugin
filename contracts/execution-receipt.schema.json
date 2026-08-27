@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opstruth:schema:execution-receipt:1.0.0",
+  "title": "OpsTruth ExecutionReceipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schemaVersion",
+    "receiptId",
+    "requestDigest",
+    "authorizationDigest",
+    "idempotencyKey",
+    "consumedAuthorizationNonce",
+    "executor",
+    "startedAt",
+    "completedAt",
+    "executionState",
+    "operations",
+    "affectedResources",
+    "artifacts",
+    "claims",
+    "changedState",
+    "errors",
+    "warnings",
+    "digest",
+    "proof"
+  ],
+  "properties": {
+    "schema": { "const": "opstruth.execution-receipt" },
+    "schemaVersion": { "const": "1.0.0" },
+    "receiptId": { "$ref": "#/$defs/urn" },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "authorizationDigest": { "$ref": "#/$defs/digest" },
+    "idempotencyKey": { "type": "string", "minLength": 16, "maxLength": 200, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "consumedAuthorizationNonce": { "type": "string", "minLength": 16, "maxLength": 200, "pattern": "^[A-Za-z0-9._:-]+$" },
+    "executor": { "$ref": "#/$defs/identity" },
+    "startedAt": { "$ref": "#/$defs/timestamp" },
+    "completedAt": { "$ref": "#/$defs/timestamp" },
+    "executionState": { "enum": ["SUCCEEDED", "FAILED", "PARTIAL", "CANCELLED", "REJECTED", "UNKNOWN"] },
+    "operations": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/operation" }
+    },
+    "affectedResources": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/resource" }
+    },
+    "artifacts": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/reference" }
+    },
+    "claims": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/claim" }
+    },
+    "changedState": { "type": "boolean" },
+    "errors": { "$ref": "#/$defs/messages" },
+    "warnings": { "$ref": "#/$defs/messages" },
+    "digest": { "$ref": "#/$defs/digest" },
+    "proof": { "$ref": "#/$defs/proof" }
+  },
+  "$defs": {
+    "urn": { "type": "string", "minLength": 8, "maxLength": 300, "pattern": "^urn:[A-Za-z0-9][A-Za-z0-9:._-]+$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": { "$ref": "#/$defs/urn" },
+        "type": { "enum": ["service", "runner", "agent"] }
+      }
+    },
+    "operationType": {
+      "enum": ["modify_source", "run_declared_checks", "create_commit", "push_branch", "open_pull_request", "deploy", "rollback", "update_configuration", "rotate_secret"]
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operationId", "sequence", "type", "target", "state", "beforeDigest", "afterDigest", "evidenceRefs"],
+      "properties": {
+        "operationId": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "type": { "$ref": "#/$defs/operationType" },
+        "target": { "$ref": "#/$defs/urn" },
+        "state": { "enum": ["SUCCEEDED", "FAILED", "SKIPPED", "UNKNOWN"] },
+        "beforeDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "afterDigest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] },
+        "evidenceRefs": { "type": "array", "maxItems": 50, "uniqueItems": true, "items": { "$ref": "#/$defs/reference" } }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "digest"],
+      "properties": {
+        "id": { "$ref": "#/$defs/urn" },
+        "type": { "enum": ["repository", "branch", "commit", "pull_request", "artifact", "deployment", "configuration", "secret_version"] },
+        "digest": { "oneOf": [{ "$ref": "#/$defs/digest" }, { "type": "null" }] }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "digest"],
+      "properties": {
+        "id": { "$ref": "#/$defs/urn" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assertionId", "outcome", "observedValue", "evidenceRefs"],
+      "properties": {
+        "assertionId": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[A-Za-z0-9._:-]+$" },
+        "outcome": { "enum": ["SATISFIED", "NOT_SATISFIED", "UNKNOWN"] },
+        "observedValue": true,
+        "evidenceRefs": { "type": "array", "maxItems": 50, "uniqueItems": true, "items": { "$ref": "#/$defs/reference" } }
+      }
+    },
+    "messages": { "type": "array", "maxItems": 100, "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "signerFingerprint", "publicKeyPem", "signatureBase64"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "signerFingerprint": { "$ref": "#/$defs/digest" },
+        "publicKeyPem": { "type": "string", "minLength": 80, "maxLength": 1000 },
+        "signatureBase64": { "type": "string", "minLength": 80, "maxLength": 200, "pattern": "^[A-Za-z0-9+/]+={0,2}$" }
+      }
+    }
+  }
+}

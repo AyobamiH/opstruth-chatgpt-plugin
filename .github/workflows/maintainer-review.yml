@@ -1,0 +1,34 @@
+name: OpsTruth maintainer review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintainer-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Verify repository and authority boundary
+        run: npm run check
+      - name: Publish deterministic maintainer evidence
+        env:
+          OPSTRUTH_BASE_REF: ${{ github.event.pull_request.base.sha }}
+          OPSTRUTH_HEAD_REF: ${{ github.event.pull_request.head.sha }}
+          OPSTRUTH_CHECK_STATUS: passed
+          OPSTRUTH_BOUNDARY_STATUS: passed
+        run: npm run maintainer:review

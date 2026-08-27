@@ -1,0 +1,23 @@
+{
+  "schema": "opstruth.action-authorization",
+  "schemaVersion": "1.0.0",
+  "authorizationId": "urn:uuid:22222222-2222-4222-8222-222222222222",
+  "requestDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "decision": "APPROVED",
+  "issuedAt": "2026-08-27T12:05:00Z",
+  "expiresAt": "2026-08-27T12:35:00Z",
+  "nonce": "nonce.22222222-2222-4222-8222-222222222222",
+  "approver": {
+    "id": "urn:opstruth:human:repository-owner",
+    "type": "human"
+  },
+  "grantedOperations": ["modify_source", "run_declared_checks", "create_commit", "push_branch", "open_pull_request"],
+  "constraintsDigest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+  "proof": {
+    "algorithm": "Ed25519",
+    "signerFingerprint": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA0000000000000000000000000000000000000000000=\n-----END PUBLIC KEY-----",
+    "signatureBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  }
+}
