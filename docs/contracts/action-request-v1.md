@@ -14,6 +14,7 @@ An ActionRequest translates a finding into a bounded, reviewable proposal. It do
 - `subject` binds the provider repository ID and exact baseline commit before execution. An optional environment narrows deployment work.
 - `findingRefs` bind the request to evidence graph findings or report digests.
 - `requestedOutcome.assertions` are independently verifiable postconditions.
+- Each assertion has a controlled `target` node type, field, and bounded match selector. Descriptive prose never drives the deterministic verifier.
 - `permittedOperations` is an allowlist. Absence from this list means not permitted.
 - `forbiddenOperations` records explicit denials that cannot be weakened by authorization.
 - `constraints` bounds paths, duration, operation count, network behavior, and environments.

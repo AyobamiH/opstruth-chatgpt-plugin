@@ -3,6 +3,7 @@
 AGENTS.md @AyobamiH
 SECURITY.md @AyobamiH
 contracts/ @AyobamiH
+schemas/ @AyobamiH
 docs/architecture/ @AyobamiH
 docs/adr/ @AyobamiH
 .github/CODEOWNERS @AyobamiH
@@ -12,6 +13,13 @@ scripts/generate-signing-key.mjs @AyobamiH
 scripts/check-boundaries.mjs @AyobamiH
 scripts/maintainer-review.mjs @AyobamiH
 scripts/validate-contracts.mjs @AyobamiH
+scripts/generate-contract-vectors.mjs @AyobamiH
+scripts/verify-vectors-standalone.mjs @AyobamiH
+src/canonical.js @AyobamiH
+src/evidence-graph.js @AyobamiH
+src/post-execution.js @AyobamiH
+src/protocol.js @AyobamiH
+src/schema-validation.js @AyobamiH
 test/architecture-boundary.test.js @AyobamiH
 test/contracts.test.js @AyobamiH
 test/maintainer-review.test.js @AyobamiH

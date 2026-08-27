@@ -84,3 +84,20 @@ test("rate-limited GitHub API falls back to a bounded public archive", async () 
     restore();
   }
 });
+
+test("raw GitHub file responses are bounded before buffering", async () => {
+  const restore = installGithubFetchMock();
+  const fixtureFetch = globalThis.fetch;
+  globalThis.fetch = async (request) => {
+    const url = new URL(typeof request === "string" ? request : request.url);
+    if (url.hostname === "raw.githubusercontent.com" && url.pathname.endsWith("/package.json")) {
+      return new Response(new Uint8Array(1024 * 1024 + 1));
+    }
+    return fixtureFetch(request);
+  };
+  try {
+    await assert.rejects(loadRepositorySnapshot("Example/project"), /GitHub raw file exceeded the 1 MiB safety limit/);
+  } finally {
+    restore();
+  }
+});

@@ -1,6 +1,7 @@
 import { gzipSync } from "node:zlib";
 
 export const repositoryMetadata = {
+  id: 424242,
   full_name: "Example/project",
   html_url: "https://github.com/Example/project",
   description: "Fixture project",
@@ -66,7 +67,7 @@ export function installGithubFetchMock() {
       return Response.json(repositoryTree);
     }
     if (url.hostname === "api.github.com" && url.pathname.endsWith("/branches/main")) {
-      return Response.json({ name: "main", protected: true, commit: { sha: "commit123" } });
+      return Response.json({ name: "main", protected: true, commit: { sha: "1111111111111111111111111111111111111111" } });
     }
     if (url.hostname === "api.github.com" && url.pathname.endsWith("/actions/runs")) {
       return Response.json({
@@ -77,7 +78,7 @@ export function installGithubFetchMock() {
           event: "push",
           status: "completed",
           conclusion: "success",
-          head_sha: "commit123",
+          head_sha: "1111111111111111111111111111111111111111",
           run_number: 7,
           run_started_at: "2026-08-25T01:00:00Z",
           updated_at: "2026-08-25T01:02:00Z",
@@ -85,13 +86,13 @@ export function installGithubFetchMock() {
         }],
       });
     }
-    if (url.hostname === "api.github.com" && url.pathname.endsWith("/commits/commit123/check-runs")) {
+    if (url.hostname === "api.github.com" && url.pathname.endsWith("/commits/1111111111111111111111111111111111111111/check-runs")) {
       return Response.json({
         total_count: 1,
         check_runs: [{ id: 201, name: "verify", status: "completed", conclusion: "success", html_url: "https://github.com/Example/project/runs/201" }],
       });
     }
-    if (url.hostname === "api.github.com" && url.pathname.endsWith("/commits/commit123/status")) {
+    if (url.hostname === "api.github.com" && url.pathname.endsWith("/commits/1111111111111111111111111111111111111111/status")) {
       return Response.json({ state: "success", statuses: [{ context: "ci", state: "success", target_url: "https://github.com/Example/project/actions/runs/101" }] });
     }
     if (url.hostname === "raw.githubusercontent.com") {

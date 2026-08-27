@@ -2,7 +2,8 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "opstruth-chatgpt",
   "main": "./src/worker.js",
-  "compatibility_date": "2026-08-01",
+  "compatibility_date": "2026-08-27",
+  "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "observability": {
     "enabled": true

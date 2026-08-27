@@ -11,9 +11,12 @@ import {
 } from "./audits.js";
 import { discoverCapabilities, planWorkflow } from "./capabilities.js";
 import { probeDeployment } from "./deployment.js";
+import { buildEvidenceGraph, compareEvidenceGraphs } from "./evidence-graph.js";
 import { loadRepositorySnapshot } from "./github.js";
+import { verifyExecutionOutcome } from "./post-execution.js";
 import { verifyAgentProofReceipt, verifyOpsTruthEvidenceReceipt } from "./receipt.js";
 import { prepareSandboxVerification } from "./sandbox.js";
+import { validateJsonSchema } from "./schema-validation.js";
 import { EVIDENCE_UI_URI } from "./ui.js";
 import { evidenceReceipt, textResult } from "./utils.js";
 import { PLUGIN_VERSION } from "./version.js";
@@ -34,6 +37,12 @@ const REPOSITORY_INPUT = {
 
 const REPORT_OUTPUT = { type: "object", additionalProperties: true };
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+const TRUSTED_SIGNERS = {
+  type: "array",
+  maxItems: 50,
+  uniqueItems: true,
+  items: { type: "string", pattern: "^sha256:[a-f0-9]{64}$" },
+};
 
 function tool(name, title, description, inputSchema = REPOSITORY_INPUT, extra = {}) {
   return {
@@ -152,6 +161,59 @@ export const TOOL_DEFINITIONS = [
     },
   ),
   tool(
+    "opstruth_snapshot_evidence",
+    "Snapshot subject-bound evidence",
+    "Use this to bind public repository, current CI and optional explicitly supplied public HTTPS runtime observations into one portable signed Evidence Graph. It never executes repository code, stores the graph or claims that a reachable endpoint proves which commit is deployed.",
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["repository_url"],
+      properties: {
+        repository_url: REPOSITORY_INPUT.properties.repository_url,
+        deployment_url: { type: ["string", "null"], maxLength: 300, pattern: "^https://" },
+        health_paths: { type: "array", maxItems: 8, uniqueItems: true, items: { type: "string", minLength: 1, maxLength: 200, pattern: "^/" } },
+        protocol_artifacts: { type: "array", maxItems: 4, items: { type: "object", additionalProperties: true } },
+      },
+    },
+    { annotations: { ...READ_ONLY, openWorldHint: true } },
+  ),
+  tool(
+    "opstruth_compare_snapshots",
+    "Compare evidence snapshots",
+    "Use this to compare two caller-held OpsTruth Evidence Graph v1 snapshots. It checks graph integrity, signer trust and subject compatibility before reporting deterministic node, edge, contradiction and verdict changes. It performs no network request and stores nothing.",
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["before", "after"],
+      properties: {
+        before: { type: "object", additionalProperties: true },
+        after: { type: "object", additionalProperties: true },
+        trusted_signer_fingerprints: TRUSTED_SIGNERS,
+      },
+    },
+  ),
+  tool(
+    "opstruth_verify_execution_result",
+    "Verify execution result",
+    "Use this after a separately authorised executor returns a signed receipt. OpsTruth validates the request, authorisation and receipt chain against separate authorizer and executor fingerprint allowlists, enforces signer-role separation, freshly re-observes public repository, CI and optional HTTPS evidence, then signs an independent VerificationResult. Executor success alone can never produce VERIFIED.",
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["repository_url", "request", "authorization", "receipt", "trusted_authorizer_fingerprints", "trusted_executor_fingerprints"],
+      properties: {
+        repository_url: REPOSITORY_INPUT.properties.repository_url,
+        deployment_url: { type: ["string", "null"], maxLength: 300, pattern: "^https://" },
+        health_paths: { type: "array", maxItems: 8, uniqueItems: true, items: { type: "string", minLength: 1, maxLength: 200, pattern: "^/" } },
+        request: { type: "object", additionalProperties: true },
+        authorization: { type: "object", additionalProperties: true },
+        receipt: { type: "object", additionalProperties: true },
+        trusted_authorizer_fingerprints: TRUSTED_SIGNERS,
+        trusted_executor_fingerprints: TRUSTED_SIGNERS,
+      },
+    },
+    { annotations: { ...READ_ONLY, openWorldHint: true } },
+  ),
+  tool(
     "opstruth_render_evidence",
     "Render evidence report",
     "Use this only after another OpsTruth data tool returned a report that should be presented as an interactive evidence summary. It does not fetch new evidence, execute code or change the supplied report.",
@@ -196,6 +258,12 @@ function summary(report) {
 }
 
 export async function callTool(name, args = {}, env = {}, ctx = {}) {
+  const inputBytes = new TextEncoder().encode(JSON.stringify(args)).byteLength;
+  if (inputBytes > 1024 * 1024) throw new Error("tool_input_exceeds_1_mib");
+  const definition = TOOL_DEFINITIONS.find((candidate) => candidate.name === name);
+  if (!definition) throw new Error("tool_not_found");
+  const inputErrors = validateJsonSchema(args, definition.inputSchema);
+  if (inputErrors.length) throw new Error(`tool_input_invalid:${inputErrors.slice(0, 10).join("|")}`);
   if (REPOSITORY_HANDLERS.has(name)) {
     const snapshot = await loadRepositorySnapshot(args.repository_url, env, ctx);
     const report = await withReceipt(await REPOSITORY_HANDLERS.get(name)(snapshot, args), env);
@@ -229,10 +297,49 @@ export async function callTool(name, args = {}, env = {}, ctx = {}) {
     const report = await verifyOpsTruthEvidenceReceipt(args.report, args.trusted_signer_fingerprints || []);
     return textResult(report, `OpsTruth evidence receipt verification: ${report.reason}. Cryptographically valid: ${report.cryptographicallyValid}. Trusted: ${report.trusted}.`);
   }
+  if (name === "opstruth_snapshot_evidence") {
+    const snapshot = await loadRepositorySnapshot(args.repository_url, env, ctx);
+    const deploymentReport = args.deployment_url
+      ? await probeDeployment({ deployment_url: args.deployment_url, health_paths: args.health_paths })
+      : null;
+    const graph = await buildEvidenceGraph({
+      repositorySnapshot: snapshot,
+      deploymentReport,
+      protocolArtifacts: args.protocol_artifacts || [],
+      observedAt: new Date().toISOString(),
+      env,
+    });
+    return textResult(graph, `OpsTruth evidence snapshot: ${graph.summary.verdict}. ${graph.nodes.length} node(s), ${graph.edges.length} edge(s), no state changed.`);
+  }
+  if (name === "opstruth_compare_snapshots") {
+    const delta = await compareEvidenceGraphs(args.before, args.after, {
+      comparedAt: new Date().toISOString(),
+      trustedSignerFingerprints: args.trusted_signer_fingerprints || [],
+    });
+    return textResult(delta, `OpsTruth evidence delta: ${delta.verdictTransition.from} to ${delta.verdictTransition.to}. No state changed.`);
+  }
+  if (name === "opstruth_verify_execution_result") {
+    const snapshot = await loadRepositorySnapshot(args.repository_url, env, ctx);
+    const deploymentReport = args.deployment_url
+      ? await probeDeployment({ deployment_url: args.deployment_url, health_paths: args.health_paths })
+      : null;
+    const verification = await verifyExecutionOutcome({
+      request: args.request,
+      authorization: args.authorization,
+      receipt: args.receipt,
+      repositorySnapshot: snapshot,
+      deploymentReport,
+      trustedAuthorizerFingerprints: args.trusted_authorizer_fingerprints,
+      trustedExecutorFingerprints: args.trusted_executor_fingerprints,
+      observedAt: new Date().toISOString(),
+      env,
+    });
+    return textResult(verification, `OpsTruth post-execution verification: ${verification.result.verdict}. Executor claims were independently checked; no state changed.`);
+  }
   if (name === "opstruth_render_evidence") {
     const report = args.report && typeof args.report === "object" ? args.report : null;
     if (!report) throw new Error("report_required");
     return textResult(report, "Rendered the supplied OpsTruth evidence report without changing it.");
   }
-  throw new Error("tool_not_found");
+  throw new Error("tool_handler_not_found");
 }

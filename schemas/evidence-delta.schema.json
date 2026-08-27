@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opstruth:schema:evidence-delta:1.0.0",
+  "title": "OpsTruth Evidence Delta v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "comparedAt", "subject", "before", "after", "nodeChanges", "edgeChanges", "verdictTransition", "newlyContradicted", "digest"],
+  "properties": {
+    "schema": { "const": "opstruth.evidence-delta" },
+    "schemaVersion": { "const": "1.0.0" },
+    "comparedAt": { "type": "string", "format": "date-time" },
+    "subject": { "type": "object" },
+    "before": { "$ref": "#/$defs/side" },
+    "after": { "$ref": "#/$defs/side" },
+    "nodeChanges": { "$ref": "#/$defs/changes" },
+    "edgeChanges": { "$ref": "#/$defs/changes" },
+    "verdictTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "to"],
+      "properties": { "from": { "$ref": "#/$defs/verdict" }, "to": { "$ref": "#/$defs/verdict" } }
+    },
+    "newlyContradicted": { "type": "array", "maxItems": 100, "items": { "type": "object" } },
+    "digest": { "$ref": "#/$defs/digest" }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "verdict": { "enum": ["VERIFIED", "PARTIAL", "CONTRADICTED", "UNPROVEN"] },
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["graphId", "digest", "verification"],
+      "properties": { "graphId": { "type": "string" }, "digest": { "$ref": "#/$defs/digest" }, "verification": { "type": "object" } }
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["added", "removed", "changed", "stale"],
+      "properties": {
+        "added": { "type": "array", "maxItems": 512, "uniqueItems": true, "items": { "type": "string" } },
+        "removed": { "type": "array", "maxItems": 512, "uniqueItems": true, "items": { "type": "string" } },
+        "changed": { "type": "array", "maxItems": 512, "uniqueItems": true, "items": { "type": "string" } },
+        "stale": { "type": "array", "maxItems": 512, "uniqueItems": true, "items": { "type": "string" } }
+      }
+    }
+  }
+}

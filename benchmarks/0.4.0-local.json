@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0.0",
+  "measuredAt": "2026-08-27T12:57:50Z",
+  "runtime": "Node.js v24.19.0",
+  "method": "Forty warm mocked opstruth_audit_repository calls per candidate in separate Node processes using scripts/benchmark-release.mjs. Values are from the final paired runs.",
+  "baseline": {
+    "version": "0.3.1",
+    "commit": "ce05e35399ce4ee86cd45b631cfd3ed737ee74a7",
+    "medianMs": 2.482,
+    "p95Ms": 6.22,
+    "maxMs": 13.837
+  },
+  "candidate": {
+    "version": "0.4.0",
+    "commit": null,
+    "source": "working tree on feat/0.4.0-evidence-graph",
+    "medianMs": 1.78,
+    "p95Ms": 4.546,
+    "maxMs": 6.401
+  },
+  "interpretation": "The existing audit path did not regress in this deterministic local benchmark. This is not a production latency SLO measurement."
+}

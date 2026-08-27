@@ -1,7 +1,7 @@
 {
   "name": "opstruth",
-  "version": "0.3.1",
-  "description": "Verify public GitHub repositories, CI evidence and deployment health with evidence-first checks.",
+  "version": "0.4.0",
+  "description": "Bind repository, CI, runtime and receipt evidence into signed graphs without changing target systems.",
   "author": {
     "name": "AYOBAMI JOHN HAASTRUP",
     "url": "https://opstruth-chatgpt.woeinvests.workers.dev"
@@ -16,7 +16,7 @@
     "logo": "./assets/logo-mark.png",
     "composerIcon": "./assets/logo-mark.png",
     "shortDescription": "Verify coding work with proof",
-    "longDescription": "OpsTruth inspects public GitHub repositories, reads current public CI and check evidence, maps routes and contracts, probes user-supplied HTTPS health endpoints, plans approval-gated sandbox verification, verifies AgentProof and OpsTruth receipts, and presents signed evidence without changing target projects.",
+    "longDescription": "OpsTruth inspects public GitHub repositories, reads current public CI evidence, probes user-supplied HTTPS health endpoints, binds observations into portable signed Evidence Graphs, compares state snapshots, and independently verifies execution receipts without changing target projects.",
     "developerName": "AYOBAMI JOHN HAASTRUP",
     "category": "Developer Tools",
     "website": "https://opstruth-chatgpt.woeinvests.workers.dev",

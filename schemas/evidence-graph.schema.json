@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:opstruth:schema:evidence-graph:1.0.0",
+  "title": "OpsTruth Evidence Graph v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schemaVersion", "graphId", "createdAt", "subject", "policy", "nodes", "edges", "summary", "digest", "proof"],
+  "properties": {
+    "schema": { "const": "opstruth.evidence-graph" },
+    "schemaVersion": { "const": "1.0.0" },
+    "graphId": { "$ref": "#/$defs/urn" },
+    "createdAt": { "$ref": "#/$defs/timestamp" },
+    "subject": { "$ref": "#/$defs/subject" },
+    "policy": { "$ref": "#/$defs/policy" },
+    "nodes": { "type": "array", "maxItems": 256, "items": { "$ref": "#/$defs/node" } },
+    "edges": { "type": "array", "maxItems": 512, "items": { "$ref": "#/$defs/edge" } },
+    "summary": { "$ref": "#/$defs/summary" },
+    "digest": { "$ref": "#/$defs/digest" },
+    "proof": { "oneOf": [{ "$ref": "#/$defs/proof" }, { "type": "null" }] }
+  },
+  "$defs": {
+    "urn": { "type": "string", "minLength": 8, "maxLength": 1000, "pattern": "^urn:[A-Za-z0-9][A-Za-z0-9:._%~-]+$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "digest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "repositoryId", "repositoryName", "commitSha"],
+      "properties": {
+        "provider": { "const": "github" },
+        "repositoryId": { "type": ["string", "null"], "maxLength": 100 },
+        "repositoryName": { "type": "string", "minLength": 3, "maxLength": 240 },
+        "commitSha": { "type": ["string", "null"], "maxLength": 64 }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stateless", "independentlyVerified", "graphLimits"],
+      "properties": {
+        "stateless": { "const": true },
+        "independentlyVerified": { "const": true },
+        "graphLimits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxNodes", "maxEdges", "maxSnapshotBytes"],
+          "properties": {
+            "maxNodes": { "const": 256 },
+            "maxEdges": { "const": 512 },
+            "maxSnapshotBytes": { "const": 524288 }
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "reference": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "permissions"],
+      "properties": {
+        "kind": { "enum": ["public", "brokered_read", "caller_supplied"] },
+        "permissions": { "type": "array", "maxItems": 10, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 100 } }
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "subjectRef", "source", "observedAt", "authority", "freshUntil", "status", "attributes", "digest"],
+      "properties": {
+        "id": { "$ref": "#/$defs/urn" },
+        "type": { "enum": ["repository", "commit", "branch", "pull_request", "ci_run", "artifact", "deployment", "runtime_observation", "configuration", "finding", "action_request", "action_authorization", "execution_receipt", "verification_result"] },
+        "subjectRef": { "type": "object" },
+        "source": { "$ref": "#/$defs/source" },
+        "observedAt": { "$ref": "#/$defs/timestamp" },
+        "authority": { "$ref": "#/$defs/authority" },
+        "freshUntil": { "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }] },
+        "status": { "enum": ["OBSERVED", "CLAIMED", "STALE", "INVALID", "UNAVAILABLE"] },
+        "attributes": { "type": "object" },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "type", "source", "observedAt", "basis", "evidenceNodeIds", "digest"],
+      "properties": {
+        "id": { "$ref": "#/$defs/urn" },
+        "from": { "$ref": "#/$defs/urn" },
+        "to": { "$ref": "#/$defs/urn" },
+        "type": { "enum": ["contains", "derived_from", "tested_by", "produced", "deployed_as", "observed_by", "addresses", "claims", "authorizes", "verifies", "contradicts", "supersedes"] },
+        "source": { "$ref": "#/$defs/source" },
+        "observedAt": { "$ref": "#/$defs/timestamp" },
+        "basis": { "enum": ["observed", "inferred"] },
+        "evidenceNodeIds": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/urn" } },
+        "digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assertionId", "verdict", "expected", "observed", "evidenceNodeIds", "explanation"],
+      "properties": {
+        "assertionId": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "expected": true,
+        "observed": true,
+        "evidenceNodeIds": { "type": "array", "maxItems": 100, "uniqueItems": true, "items": { "$ref": "#/$defs/urn" } },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "verdict": { "enum": ["VERIFIED", "PARTIAL", "CONTRADICTED", "UNPROVEN"] },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["verdict", "assertionResults", "contradictions", "counts"],
+      "properties": {
+        "verdict": { "$ref": "#/$defs/verdict" },
+        "assertionResults": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/assertion" } },
+        "contradictions": { "type": "array", "maxItems": 100, "items": { "$ref": "#/$defs/contradiction" } },
+        "counts": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodes", "edges", "contradictions", "unproven"],
+          "properties": {
+            "nodes": { "type": "integer", "minimum": 0, "maximum": 256 },
+            "edges": { "type": "integer", "minimum": 0, "maximum": 512 },
+            "contradictions": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "unproven": { "type": "integer", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    },
+    "contradiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule", "description", "nodeIds"],
+      "properties": {
+        "rule": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "nodeIds": { "type": "array", "minItems": 2, "maxItems": 10, "uniqueItems": true, "items": { "$ref": "#/$defs/urn" } }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "signerFingerprint", "publicKeyPem", "signatureBase64"],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "signerFingerprint": { "$ref": "#/$defs/digest" },
+        "publicKeyPem": { "type": "string", "minLength": 80, "maxLength": 1000 },
+        "signatureBase64": { "type": "string", "minLength": 80, "maxLength": 200 }
+      }
+    }
+  }
+}

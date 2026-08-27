@@ -1,6 +1,6 @@
 # OpsTruth Protocol Contracts
 
-Status: v1 candidates for 0.4.0
+Status: v1 protocol implemented for OpsTruth 0.4.0
 
 The execution handoff consists of four artifacts:
 
@@ -32,7 +32,7 @@ Domain separators:
 
 Signatures use Ed25519 over the same domain-separated canonical bytes. A valid signature proves integrity and signer key possession. Trust remains an explicit caller or policy decision.
 
-The files under `contracts/examples/` are structural schema fixtures. Their repeated digests, keys, and signatures are deliberately non-cryptographic placeholders and must never be used as protocol test vectors. Cryptographic canonicalization and signature vectors are a mandatory 0.4-G release deliverable.
+The files under `contracts/examples/` are structural schema fixtures. Their repeated digests, keys, and signatures are deliberately non-cryptographic placeholders and must never be used as protocol test vectors. Reproducible cryptographic vectors live in `contracts/vectors/protocol-v1.json` and are checked by both the runtime implementation and an independent standalone verifier.
 
 ## Compatibility
 

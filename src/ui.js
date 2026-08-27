@@ -24,6 +24,9 @@ export const EVIDENCE_UI_HTML = `
     .warning { color: #ffd58a; }
     .failure { color: #ff9f9f; }
     .muted { color: #94a7bd; }
+    .feedback { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    button { background: #162944; color: #d8e9fb; border: 1px solid #34506f; border-radius: 9px; padding: 7px 10px; cursor: pointer; }
+    button:disabled { cursor: default; opacity: .55; }
     @media (max-width: 520px) { .grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
   </style>
 </head>
@@ -40,6 +43,14 @@ export const EVIDENCE_UI_HTML = `
   <h2>Verified evidence</h2><ul id="verified"></ul>
   <h2>Warnings</h2><ul id="warnings" class="warning"></ul>
   <h2>Proof gaps</h2><ul id="gaps" class="muted"></ul>
+  <section class="feedback" aria-label="Result feedback">
+    <button data-reason="useful">Useful</button>
+    <button data-reason="missed_evidence">Missed evidence</button>
+    <button data-reason="false_warning">False warning</button>
+    <button data-reason="unclear_result">Unclear</button>
+    <button data-reason="incorrect_binding">Incorrect binding</button>
+    <span class="muted" id="feedbackStatus" role="status"></span>
+  </section>
 </main>
 <script>
   const byId = (id) => document.getElementById(id);
@@ -49,14 +60,30 @@ export const EVIDENCE_UI_HTML = `
   };
   const render = (report) => {
     if (!report) return;
-    byId('status').textContent = report.status || 'complete';
-    byId('repo').textContent = report.repository?.fullName || report.title || 'OpsTruth report';
-    byId('verifiedCount').textContent = (report.verified || []).length;
-    byId('warningCount').textContent = (report.warnings || []).length;
-    byId('failureCount').textContent = (report.failures || []).length;
-    byId('gapCount').textContent = (report.notVerified || []).length;
-    list('verified', report.verified); list('warnings', report.warnings); list('gaps', report.notVerified);
+    const graph = report.schema === 'opstruth.evidence-graph' ? report : report.evidenceGraph;
+    const result = report.result || report;
+    const assertions = graph?.summary?.assertionResults || result.assertionResults || [];
+    const verified = report.verified || assertions.filter((item) => item.verdict === 'VERIFIED').map((item) => item.explanation);
+    const warnings = report.warnings || result.warnings || (graph?.summary?.contradictions || []).map((item) => item.description);
+    const failures = report.failures || result.errors || [];
+    const gaps = report.notVerified || result.notVerified || assertions.filter((item) => item.verdict === 'UNPROVEN').map((item) => item.explanation);
+    byId('status').textContent = graph?.summary?.verdict || result.verdict || report.status || 'complete';
+    byId('repo').textContent = report.repository?.fullName || graph?.subject?.repositoryName || result.subject?.repositoryName || report.title || 'OpsTruth report';
+    byId('verifiedCount').textContent = verified.length;
+    byId('warningCount').textContent = warnings.length;
+    byId('failureCount').textContent = failures.length;
+    byId('gapCount').textContent = gaps.length;
+    list('verified', verified); list('warnings', warnings); list('gaps', gaps);
   };
+  for (const button of document.querySelectorAll('button[data-reason]')) {
+    button.addEventListener('click', async () => {
+      for (const candidate of document.querySelectorAll('button[data-reason]')) candidate.disabled = true;
+      try {
+        const response = await fetch('/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ reason: button.dataset.reason, surface: 'mcp' }) });
+        byId('feedbackStatus').textContent = response.ok ? 'Feedback recorded.' : 'Feedback unavailable.';
+      } catch { byId('feedbackStatus').textContent = 'Feedback unavailable.'; }
+    });
+  }
   window.addEventListener('message', (event) => {
     if (event.source !== window.parent) return;
     const message = event.data;
@@ -76,7 +103,7 @@ export function evidenceResource(baseUrl) {
       ui: {
         prefersBorder: true,
         domain: baseUrl,
-        csp: { connectDomains: [], resourceDomains: [] },
+        csp: { connectDomains: [baseUrl], resourceDomains: [] },
       },
     },
   };

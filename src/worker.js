@@ -2,11 +2,11 @@ import { callTool, TOOL_DEFINITIONS } from "./tools.js";
 import { evidenceResource, EVIDENCE_UI_URI } from "./ui.js";
 import { asErrorMessage, htmlResponse, jsonResponse, signingMetadata } from "./utils.js";
 import { landingPage, privacyPage, supportPage, termsPage } from "./pages.js";
-import { recordToolEvent } from "./analytics.js";
+import { recordFeedbackEvent, recordToolEvent, summarizeToolResult } from "./analytics.js";
 import { PLUGIN_VERSION } from "./version.js";
 
 const SERVER = { name: "opstruth", version: PLUGIN_VERSION };
-const INSTRUCTIONS = "Use OpsTruth for evidence-first public GitHub and user-supplied HTTPS health checks. Inspect before broad audits, prefer the narrowest matching tool, never ask for credentials, use current public CI evidence when available, never infer build success from static files, and separate verified facts from warnings and proof gaps. Sandbox preparation is a handoff only and requires a separately connected approval-gated runner. Use the render tool only after a data tool returns a final report.";
+const INSTRUCTIONS = "Use OpsTruth for evidence-first public GitHub and user-supplied HTTPS health checks. Inspect before broad audits and prefer the narrowest matching tool. Use signed Evidence Graph snapshots when repository, commit, CI and optional runtime observations must be bound to one subject; compare only compatible caller-held snapshots. Verify execution outcomes only from a complete request, authorisation and receipt chain with separate authoritative authorizer and executor fingerprint allowlists, and never infer success from the receipt state. Never ask for credentials, infer build success from static files or mutate the target. Use the render tool only after a data tool returns a final report.";
 
 function rpcResult(id, result) {
   return { jsonrpc: "2.0", id, result };
@@ -42,8 +42,9 @@ async function handleRpc(payload, request, env, ctx) {
     if (!params.name || typeof params.name !== "string") return rpcError(id, -32602, "Tool name required");
     const started = Date.now();
     try {
-      const response = rpcResult(id, await callTool(params.name, params.arguments || {}, env, ctx));
-      recordToolEvent(env, ctx, request, { tool: params.name, outcome: "success", status: 200, latencyMs: Date.now() - started });
+      const toolResult = await callTool(params.name, params.arguments || {}, env, ctx);
+      const response = rpcResult(id, toolResult);
+      recordToolEvent(env, ctx, request, { tool: params.name, outcome: "success", status: 200, latencyMs: Date.now() - started, ...summarizeToolResult(toolResult) });
       return response;
     } catch (error) {
       recordToolEvent(env, ctx, request, { tool: params.name, outcome: "error", status: 200, latencyMs: Date.now() - started });
@@ -73,9 +74,15 @@ async function mcpResponse(request, env, ctx) {
   if (request.method !== "POST") {
     return jsonResponse({ error: "method_not_allowed", allowed: ["POST", "OPTIONS"] }, 405, { allow: "POST, OPTIONS", ...corsHeaders(request) });
   }
+  const maxBodyBytes = 1024 * 1024 + 64 * 1024;
+  if (Number(request.headers.get("content-length") || 0) > maxBodyBytes) {
+    return jsonResponse(rpcError(null, -32600, "Request body exceeds the bounded MCP limit"), 413, corsHeaders(request));
+  }
   let payload;
   try {
-    payload = await request.json();
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > maxBodyBytes) return jsonResponse(rpcError(null, -32600, "Request body exceeds the bounded MCP limit"), 413, corsHeaders(request));
+    payload = JSON.parse(raw);
   } catch {
     return jsonResponse(rpcError(null, -32700, "Parse error"), 400, corsHeaders(request));
   }
@@ -87,6 +94,25 @@ async function mcpResponse(request, env, ctx) {
 async function fetchHandler(request, env, ctx) {
   const url = new URL(request.url);
   if (url.pathname === "/mcp") return mcpResponse(request, env, ctx);
+  if (url.pathname === "/feedback") {
+    if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed", allowed: ["POST"] }, 405, { allow: "POST" });
+    if (Number(request.headers.get("content-length") || 0) > 1024) return jsonResponse({ error: "feedback_too_large" }, 413);
+    let payload;
+    try {
+      const raw = await request.text();
+      if (new TextEncoder().encode(raw).byteLength > 1024) return jsonResponse({ error: "feedback_too_large" }, 413);
+      payload = JSON.parse(raw);
+    } catch { return jsonResponse({ error: "feedback_invalid" }, 400); }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload) || Object.keys(payload).some((key) => !["reason", "surface"].includes(key))) {
+      return jsonResponse({ error: "feedback_invalid" }, 400);
+    }
+    try {
+      const recorded = recordFeedbackEvent(env, ctx, { reason: payload.reason, surface: payload.surface });
+      return jsonResponse({ status: recorded ? "accepted" : "not_configured", retainedFields: recorded ? ["reason", "surface", "version"] : [] }, recorded ? 202 : 503);
+    } catch (error) {
+      return jsonResponse({ error: asErrorMessage(error) }, 400);
+    }
+  }
   if (url.pathname === "/health") {
     const signing = await signingMetadata(env);
     return jsonResponse({
@@ -95,6 +121,7 @@ async function fetchHandler(request, env, ctx) {
       version: SERVER.version,
       commit: env?.OPSTRUTH_BUILD_COMMIT || null,
       tools: TOOL_DEFINITIONS.length,
+      evidenceGraph: "1.0.0",
       mode: "read-only-public-evidence",
       evidenceSigning: signing.status,
       analytics: env?.OPSTRUTH_ANALYTICS ? "configured" : "not_configured",

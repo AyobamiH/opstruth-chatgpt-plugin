@@ -16,7 +16,7 @@ OpsTruth issues a post-execution verdict only after binding the request, authori
 - Receipt success cannot directly map to `VERIFIED`.
 - Missing deployment identity remains `UNPROVEN` even if health probes pass.
 - Conflicting evidence is preserved and reported.
-- Verifier and executor identities and keys remain separate.
+- Authorizer, executor and verifier identities and keys remain separate, with role-specific trust policy.
 
 ## Rejected alternatives
 

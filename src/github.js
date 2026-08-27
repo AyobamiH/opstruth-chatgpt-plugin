@@ -6,6 +6,7 @@ const MAX_TREE_ENTRIES = 20000;
 const MAX_FILES = 30;
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+const MAX_GITHUB_API_BYTES = 16 * 1024 * 1024;
 const MAX_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
 const decoder = new TextDecoder();
@@ -77,7 +78,12 @@ async function githubApi(path, ctx, env = {}) {
     }
     throw new Error(`GitHub request failed with status ${response.status}`);
   }
-  return response.json();
+  const bytes = await readBounded(response.body, MAX_GITHUB_API_BYTES, "GitHub API response");
+  try {
+    return JSON.parse(decoder.decode(bytes));
+  } catch {
+    throw new Error("GitHub API returned invalid JSON");
+  }
 }
 
 async function optionalGithubApi(path, ctx, env = {}) {
@@ -300,6 +306,7 @@ async function loadArchiveSnapshot(repository, ctx) {
       owner: repository.owner,
       name: repository.repo,
       fullName: repository.fullName,
+      providerRepositoryId: null,
       htmlUrl: repository.htmlUrl,
       description: null,
       defaultBranch: "HEAD",
@@ -331,8 +338,9 @@ async function fetchRawFile(repository, branch, entry) {
   const url = `https://raw.githubusercontent.com/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/${encodeURIComponent(branch)}/${encodedPath}`;
   const response = await fetch(new Request(url, { headers: { "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}` } }));
   if (!response.ok) return null;
-  const text = (await response.text()).slice(0, MAX_FILE_BYTES);
-  return { path: entry.path, text, truncated: Number(entry.size || 0) > text.length };
+  const bytes = await readBounded(response.body, MAX_FILE_BYTES, "GitHub raw file");
+  const text = decoder.decode(bytes);
+  return { path: entry.path, text, truncated: Number(entry.size || 0) > bytes.byteLength };
 }
 
 async function fetchSelectedFiles(repository, branch, tree) {
@@ -472,6 +480,7 @@ export async function loadRepositorySnapshot(input, env = {}, ctx = {}) {
       owner: repository.owner,
       name: repository.repo,
       fullName: metadata.full_name,
+      providerRepositoryId: metadata.id === undefined || metadata.id === null ? null : String(metadata.id),
       htmlUrl: metadata.html_url,
       description: metadata.description,
       defaultBranch: branch,
