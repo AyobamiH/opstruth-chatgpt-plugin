@@ -120,10 +120,29 @@
     "assertion": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["assertionId", "description", "predicate", "expected", "evidenceRequirements"],
+      "required": ["assertionId", "description", "target", "predicate", "expected", "evidenceRequirements"],
       "properties": {
         "assertionId": { "type": "string", "minLength": 1, "maxLength": 100, "pattern": "^[A-Za-z0-9._:-]+$" },
         "description": { "type": "string", "minLength": 3, "maxLength": 1000 },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nodeType", "field", "match"],
+          "properties": {
+            "nodeType": { "enum": ["repository", "commit", "ci_run", "artifact", "deployment", "runtime_observation", "configuration"] },
+            "field": { "enum": ["exists", "sha", "headCommitSha", "contentDigest", "commitSha", "status", "ok"] },
+            "match": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "path": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^/" },
+                "environment": { "type": "string", "minLength": 1, "maxLength": 100 },
+                "id": { "type": "string", "minLength": 1, "maxLength": 300 },
+                "current": { "type": "boolean" }
+              }
+            }
+          }
+        },
         "predicate": { "enum": ["equals", "exists", "absent", "matches_digest", "status_in", "reachable"] },
         "expected": true,
         "evidenceRequirements": {

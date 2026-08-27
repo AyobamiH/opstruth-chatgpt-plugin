@@ -188,3 +188,11 @@ Evidence Graph v1 is complete only when:
 7. Two compatible snapshots can produce a deterministic delta.
 8. No graph contents enter aggregate analytics.
 9. Existing 0.3.1 tools remain read-only and backward compatible.
+
+## Implemented public operations
+
+- `opstruth_snapshot_evidence` builds and signs a bounded caller-held graph from current public observations.
+- `opstruth_compare_snapshots` verifies subject compatibility and reports a deterministic delta without network access.
+- `opstruth_verify_execution_result` validates a complete handoff chain against separate authorizer and executor trust allowlists, enforces signer-role separation, and performs fresh independent observation before signing a VerificationResult.
+
+The runtime implementation is in `src/evidence-graph.js`, canonicalisation in `src/canonical.js`, protocol verification in `src/protocol.js`, and deterministic post-execution evaluation in `src/post-execution.js`. Graph and delta schemas are under `schemas/`.

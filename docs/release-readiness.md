@@ -1,51 +1,54 @@
-# Release readiness evidence
+# OpsTruth 0.4.0 Release Readiness
+Candidate: Evidence Graph release
+Authority: read-only evidence plane
 
-Date: 2026-08-25
-Candidate: OpsTruth hybrid plugin 0.3.1
+## Release promise
 
-## 0.3.1 hardening additions
+OpsTruth binds public repository, commit, CI, optional runtime and caller-supplied execution-receipt evidence to exact subjects. It preserves contradictions, reports proof gaps, produces portable signed snapshots, compares compatible snapshots and independently verifies execution outcomes without changing the target system.
 
-- Privacy-safe Cloudflare Analytics Engine events record aggregate tool, outcome, latency, version and coarse client family only. Prompts, repository names, URLs, IPs and user identifiers are never persisted.
-- `/health` exposes the deployed commit identity and whether the analytics binding is configured.
-- Production deployment performs a post-deploy smoke test for health, policy and MCP initialization routes.
-- GitHub Actions references are pinned to immutable commit SHAs and Wrangler is invoked at exact version `4.33.1`.
-- Five positive and three negative golden discovery prompts are validated in CI.
-- Tool and skill descriptions state both positive triggers and disallowed use cases.
-- Every evidence report uses the same verdict vocabulary: `Ready for live validation`, `Insufficient evidence` or `Not ready`. None is a production approval.
+## Implemented functionality
 
-## Analytics
+- Evidence Graph v1 schema with 256-node, 512-edge and 512 KiB snapshot caps.
+- RFC 8785 JSON canonicalisation and domain-separated SHA-256 digests.
+- Ed25519 portable snapshot signing and offline verification.
+- Deterministic compatible-subject state deltas, including freshness expiry.
+- Six deterministic contradiction classes for commit, artifact, deployment, route, receipt and supersession conflicts.
+- Runtime schema validation for graphs and all four execution-handoff artifacts.
+- Real cryptographic vectors verified by the runtime implementation and a standalone verifier.
+- Independent post-execution verification with separate authorizer, executor and verifier identities and role-specific trust allowlists.
+- Three additive read-only MCP tools: snapshot, compare and verify execution result.
+- Canonical compatibility locks for all sixteen 0.3.1 public tool contracts.
+- Analytics v2 and optional reason-coded feedback with no subject, prompt, URL, receipt, graph, free-text or user identifiers.
+- Controlled five-mode product-value evaluation protocol. Results remain explicitly unmeasured until the comparison is run.
 
-The `OPSTRUTH_ANALYTICS` binding writes one non-blocking data point per MCP tool call to the `opstruth_usage` Analytics Engine dataset. The dataset is created on its first write. Query it from an owner-controlled shell with an Account Analytics:Read token:
+## Security and privacy invariants
 
-```sh
-export CLOUDFLARE_ACCOUNT_ID=...
-export CLOUDFLARE_ANALYTICS_READ_TOKEN=...
-OPSTRUTH_ANALYTICS_DAYS=7 npm run analytics
-```
+- No public tool mutates a target repository, CI system, provider, deployment or runtime.
+- No public input accepts tokens, passwords, private keys or other credentials.
+- Private repository production access, provider-authenticated deployment verification, managed graph history and Executioner remain deferred.
+- Receipt state never determines the independent verification verdict.
+- Unknown signer trust, invalid signatures, stale evidence, incompatible subjects and proof gaps fail closed.
+- Global nonce reuse remains explicitly unproven in the stateless public plugin.
+- Graphs and protocol artifacts are returned to the caller and are not copied into analytics.
 
-The report measures tool calls and coarse client families, not unique ChatGPT users. An unauthenticated public MCP endpoint has no privacy-safe stable user identifier, so exact user counts are intentionally unavailable. Use Cloudflare Workers Observability for request-level latency and errors alongside the tool-level dataset.
+## Mandatory local and remote evidence
 
-## Verified locally
+- `npm run check` passes on the release commit.
+- The 0.3.1 tool-contract compatibility test passes.
+- Evidence schemas, structural examples and real cryptographic vectors pass.
+- Adversarial tamper, signer, subject, expiry, scope and contradiction tests pass.
+- Wrangler produces a deployable Worker bundle.
+- Pull-request CI and contents-read maintainer review pass on the exact head commit.
+- Post-merge CI and Cloudflare deployment pass on the exact main commit.
+- `/health` reports version `0.4.0`, 19 tools, Evidence Graph `1.0.0` and the exact deployed commit.
+- `/mcp`, `/signing-key`, `/privacy`, `/terms`, `/support` and reason-coded feedback are freshly checked.
 
-- Source safety check passed.
-- Seventeen Node tests passed with zero failures.
-- Six skills passed plugin validation.
-- Sixteen MCP tools have unique names, explicit schemas and read-only annotations.
-- Six source systems have pinned repository commits and integration boundaries.
-- Secret scan passed with zero actionable, documentation, placeholder, local, generated, dependency, binary or unknown findings.
-- MCP initialize, tool listing, resource listing, tool calls, evidence receipts and policy routes were exercised.
-- AgentProof v2 valid, trusted, untrusted and tampered receipt paths were exercised.
-- OpsTruth Ed25519 signing, trusted, untrusted and tampered evidence-receipt paths were exercised.
-- Public GitHub workflow, check-run, commit-status and branch-protection evidence was exercised.
-- HTTPS deployment probing passed and rejected localhost and IP-literal targets.
-- The sandbox runner handoff stayed approval-gated and executed no repository commands.
-- The analyser extracted 62 Express routes from the 547,645-byte OpenClaw Operator entry point that version 0.2.0 skipped.
+## Publication separation
 
-## Production gates
+Repository merge, Cloudflare deployment, OpenAI review and visible ChatGPT directory publication are separate states. Do not claim directory publication until version 0.4.0 is visible in the published listing.
 
-- GitHub remote repository must exist and receive the verified commit.
-- Cloudflare must deploy the Worker to the declared production origin.
-- Cloudflare must provision the stable evidence-signing key pair as Worker secrets.
-- Production health, policy and MCP routes must be verified.
-- OpenAI must scan the production endpoint and approve the hybrid plugin version.
-- Publication can occur only after approval.
+## Remaining non-code gates
+
+- Protect `main` with required CI, maintainer-review and human approval rules.
+- Run the controlled five-mode product-value comparison before making superiority claims.
+- Complete OpenAI review and confirm visible directory version 0.4.0.

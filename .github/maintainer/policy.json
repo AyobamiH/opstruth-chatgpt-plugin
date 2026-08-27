@@ -20,12 +20,20 @@
   "protectedPrefixes": [
     ".github/workflows/",
     "contracts/",
+    "schemas/",
     "docs/architecture/",
     "docs/adr/",
     "scripts/check-boundaries.mjs",
     "scripts/generate-signing-key.mjs",
     "scripts/maintainer-review.mjs",
     "scripts/validate-contracts.mjs",
+    "scripts/generate-contract-vectors.mjs",
+    "scripts/verify-vectors-standalone.mjs",
+    "src/canonical.js",
+    "src/evidence-graph.js",
+    "src/post-execution.js",
+    "src/protocol.js",
+    "src/schema-validation.js",
     "test/architecture-boundary.test.js",
     "test/contracts.test.js",
     "test/maintainer-review.test.js"
@@ -39,17 +47,25 @@
     "src/worker.js",
     "skills/",
     ".github/",
-    "contracts/"
+    "contracts/",
+    "schemas/",
+    "src/canonical.js",
+    "src/evidence-graph.js",
+    "src/post-execution.js",
+    "src/protocol.js",
+    "src/schema-validation.js"
   ],
   "minorImpactPrefixes": [
     "src/tools.js",
     "skills/",
-    "contracts/"
+    "contracts/",
+    "schemas/"
   ],
   "patchImpactPrefixes": [
     "src/",
     "test/",
     "scripts/",
+    "benchmarks/",
     "evals/",
     "worker-ui/"
   ]

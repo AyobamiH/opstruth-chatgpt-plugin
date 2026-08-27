@@ -16,6 +16,9 @@ export const CAPABILITIES = [
   { tool: "opstruth_discover_capabilities", name: "Capability discovery", authority: "read", source: "capability-intelligence", terms: ["capability", "discover", "existing", "reuse", "tool", "skill", "mcp"] },
   { tool: "opstruth_verify_receipt", name: "Receipt verifier", authority: "read", source: "agentproof", terms: ["receipt", "signature", "signed", "agentproof", "proof", "trust"] },
   { tool: "opstruth_verify_evidence_receipt", name: "OpsTruth evidence verifier", authority: "read", source: "opstruth", terms: ["receipt", "signature", "signed", "opstruth", "evidence", "proof", "trust"] },
+  { tool: "opstruth_snapshot_evidence", name: "Evidence Graph snapshot", authority: "read", source: "opstruth", terms: ["snapshot", "graph", "evidence", "binding", "state", "portable"] },
+  { tool: "opstruth_compare_snapshots", name: "Evidence state delta", authority: "read", source: "opstruth", terms: ["compare", "delta", "changed", "snapshot", "drift", "since"] },
+  { tool: "opstruth_verify_execution_result", name: "Independent execution verification", authority: "read", source: "opstruth", terms: ["execution", "executor", "receipt", "outcome", "post", "verify"] },
 ];
 
 const WRITE_TERMS = ["write", "change", "edit", "commit", "push", "merge", "deploy", "publish", "delete", "apply", "execute", "run migration"];

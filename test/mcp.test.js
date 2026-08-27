@@ -3,13 +3,14 @@ import test from "node:test";
 import { generateKeyPairSync } from "node:crypto";
 import worker, { handleRpc } from "../src/worker.js";
 import { installGithubFetchMock } from "./fixtures.js";
+import { protocolChain } from "./protocol-fixtures.js";
 
 test("MCP initialization advertises tools and resources", async () => {
   const request = new Request("https://example.test/mcp", { method: "POST" });
   const initialized = await handleRpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, request, {}, {});
   assert.equal(initialized.result.serverInfo.name, "opstruth");
   const listed = await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, request, {}, {});
-  assert.equal(listed.result.tools.length, 16);
+  assert.equal(listed.result.tools.length, 19);
   assert.ok(listed.result.tools.every((tool) => tool.annotations.readOnlyHint === true));
   const resources = await handleRpc({ jsonrpc: "2.0", id: 3, method: "resources/list" }, request, {}, {});
   assert.equal(resources.result.resources[0].uri, "ui://opstruth/evidence-v1.html");
@@ -63,13 +64,36 @@ test("worker serves health and policy routes", async () => {
   const health = await worker.fetch(new Request("https://example.test/health"), { OPSTRUTH_BUILD_COMMIT: "abc123" }, {});
   assert.equal(health.status, 200);
   const healthBody = await health.json();
-  assert.equal(healthBody.tools, 16);
+  assert.equal(healthBody.tools, 19);
+  assert.equal(healthBody.evidenceGraph, "1.0.0");
   assert.equal(healthBody.commit, "abc123");
   for (const path of ["/privacy", "/terms", "/support"]) {
     const response = await worker.fetch(new Request(`https://example.test${path}`), {}, {});
     assert.equal(response.status, 200);
     assert.match(response.headers.get("content-type"), /text\/html/);
   }
+});
+
+test("feedback endpoint accepts only bounded reason codes", async () => {
+  const writes = [];
+  const pending = [];
+  const env = { OPSTRUTH_ANALYTICS: { writeDataPoint: (point) => writes.push(point) } };
+  const accepted = await worker.fetch(new Request("https://example.test/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reason: "useful", surface: "mcp" }),
+  }), env, { waitUntil: (promise) => pending.push(promise) });
+  await Promise.all(pending);
+  assert.equal(accepted.status, 202);
+  assert.deepEqual((await accepted.json()).retainedFields, ["reason", "surface", "version"]);
+  assert.deepEqual(writes[0].blobs, ["feedback", "useful", "mcp", "0.4.0"]);
+
+  const rejected = await worker.fetch(new Request("https://example.test/feedback", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reason: "free text", surface: "mcp", repository: "Example/project" }),
+  }), env, {});
+  assert.equal(rejected.status, 400);
 });
 
 test("deployment probing validates public HTTPS targets and retains no body", async () => {
@@ -170,4 +194,69 @@ test("non-GitHub repository request fails closed without mutation", async () => 
   }, request, {}, {});
   assert.equal(result.result.isError, true);
   assert.equal(result.result.structuredContent.changedState, false);
+});
+
+test("MCP enforces tool schemas server-side and rejects unknown fields", async () => {
+  const request = new Request("https://example.test/mcp", { method: "POST" });
+  const result = await handleRpc({
+    jsonrpc: "2.0", id: 51, method: "tools/call",
+    params: { name: "opstruth_compare_snapshots", arguments: { before: {}, after: {}, token: "must-not-be-accepted" } },
+  }, request, {}, {});
+  assert.equal(result.result.isError, true);
+  assert.match(result.result.structuredContent.error, /tool_input_invalid/);
+  assert.equal(result.result.structuredContent.changedState, false);
+});
+
+test("MCP creates and compares caller-held signed evidence snapshots", async () => {
+  const restore = installGithubFetchMock();
+  try {
+    const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+    const env = {
+      OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8: privateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+      OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI: publicKey.export({ type: "spki", format: "pem" }).toString(),
+    };
+    const request = new Request("https://example.test/mcp", { method: "POST" });
+    const snapshotResponse = await handleRpc({
+      jsonrpc: "2.0", id: 81, method: "tools/call",
+      params: { name: "opstruth_snapshot_evidence", arguments: { repository_url: "Example/project" } },
+    }, request, env, {});
+    const graph = snapshotResponse.result.structuredContent;
+    assert.equal(graph.schema, "opstruth.evidence-graph");
+    assert.equal(graph.summary.verdict, "VERIFIED");
+    assert.equal(graph.proof.signerFingerprint.startsWith("sha256:"), true);
+
+    const deltaResponse = await handleRpc({
+      jsonrpc: "2.0", id: 82, method: "tools/call",
+      params: { name: "opstruth_compare_snapshots", arguments: { before: graph, after: graph, trusted_signer_fingerprints: [graph.proof.signerFingerprint] } },
+    }, request, env, {});
+    assert.deepEqual(deltaResponse.result.structuredContent.nodeChanges, { added: [], removed: [], changed: [], stale: [] });
+  } finally {
+    restore();
+  }
+});
+
+test("MCP independently verifies an executor receipt against fresh GitHub evidence", async () => {
+  const restore = installGithubFetchMock();
+  try {
+    const chain = await protocolChain();
+    const request = new Request("https://example.test/mcp", { method: "POST" });
+    const response = await handleRpc({
+      jsonrpc: "2.0", id: 83, method: "tools/call",
+      params: {
+        name: "opstruth_verify_execution_result",
+        arguments: {
+          repository_url: "Example/project",
+          request: chain.request,
+          authorization: chain.authorization,
+          receipt: chain.receipt,
+          trusted_authorizer_fingerprints: [chain.authorization.proof.signerFingerprint],
+          trusted_executor_fingerprints: [chain.receipt.proof.signerFingerprint],
+        },
+      },
+    }, request, chain.verifierEnv, {});
+    assert.equal(response.result.structuredContent.result.verdict, "VERIFIED");
+    assert.equal(response.result.structuredContent.result.proof.signerFingerprint === chain.receipt.proof.signerFingerprint, false);
+  } finally {
+    restore();
+  }
 });

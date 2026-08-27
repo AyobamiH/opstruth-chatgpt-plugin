@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0.0",
+  "release": "0.3.1",
+  "domainSeparator": "opstruth.tool-definition.v1\\0",
+  "tools": {
+    "opstruth_inspect_repository": "sha256:610fc2a9c41bed7e98443e84323057210c3ebef67482df0055a8298271bc4a96",
+    "opstruth_audit_repository": "sha256:725957424adfbf72ac7e2cd67688ffb35cdc73b43c11db53f83a65253fefdc07",
+    "opstruth_trace_routes": "sha256:c6fee9f111d5fffeda378fb4f50f936a8497a677f44e684965588546a05ecead",
+    "opstruth_audit_environment": "sha256:1756a9102b72e9786c21c592391570c0110a917c36f5a87265a9c26dda48fc2d",
+    "opstruth_audit_secrets": "sha256:b8368fc658eccf0eaebe208e7aa444776440e7e92bbbeb66bb623245f323c9c8",
+    "opstruth_review_api_contracts": "sha256:b294c33a7077e99601768b97697bb7ddda8c28440a36627de4a0e3b14790353a",
+    "opstruth_review_migrations": "sha256:c389ecf2a5cd3d0a46cabe134496b66da3af08d96cc9415b0c37153c215eefcc",
+    "opstruth_check_github_handoff": "sha256:5acc0e99e440790192fef7a63d17359efadfd0c28e7aab299d6cd8cc8f428a35",
+    "opstruth_check_deployment": "sha256:c728b6e16fcdb88f5e1f6cdfc1c18b8a35cd50356867e7638bc398790ad62eb7",
+    "opstruth_probe_deployment": "sha256:10b6433baffd1a69a45390fab59f79136af1f0b755c40d235f43e89bda49473c",
+    "opstruth_prepare_sandbox_verification": "sha256:33ea5e57c59bbcf448c4272b35527d3653a55a11aaba6e68c253684c07058dd4",
+    "opstruth_discover_capabilities": "sha256:1a22902a328a9d5e97ebb149247000220fbca5ea6c275c66314210d5e7c8cfee",
+    "opstruth_plan_workflow": "sha256:05b2920a3258dd39b5edaae10d49bca7af7f5c8f1c2e993819c0c471df8f9877",
+    "opstruth_verify_receipt": "sha256:24bf30226b63c5d66709f417aca80cb42bc3c995fac9601354df7733848c9ed6",
+    "opstruth_verify_evidence_receipt": "sha256:0c51794d9deb0429be68de58824eed3b60f7984f41017c916e041e87c6a96b75",
+    "opstruth_render_evidence": "sha256:6cca543f65e5c76cb53cd5b118f7fa2db56ed3fd4b2f1af876c11710cab244cf"
+  }
+}

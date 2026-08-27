@@ -32,27 +32,27 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
       - name: Deploy bootstrap Worker with commit identity
-        run: npx --yes wrangler@4.33.1 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
+        run: npx --yes wrangler@4.127.0 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
       - name: Provision stable evidence-signing key once
         shell: bash
         run: |
           set -euo pipefail
           secret_list="$RUNNER_TEMP/opstruth-secret-list.json"
-          npx --yes wrangler@4.33.1 secret list > "$secret_list"
+          npx --yes wrangler@4.127.0 secret list > "$secret_list"
           if grep -q 'OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8' "$secret_list" && grep -q 'OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI' "$secret_list"; then
             exit 0
           fi
           private_key="$RUNNER_TEMP/opstruth-private.pem"
           public_key="$RUNNER_TEMP/opstruth-public.pem"
           node scripts/generate-signing-key.mjs "$private_key" "$public_key"
-          npx --yes wrangler@4.33.1 secret put OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8 < "$private_key"
-          npx --yes wrangler@4.33.1 secret put OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI < "$public_key"
+          npx --yes wrangler@4.127.0 secret put OPSTRUTH_RECEIPT_PRIVATE_KEY_PKCS8 < "$private_key"
+          npx --yes wrangler@4.127.0 secret put OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI < "$public_key"
           rm -f "$private_key" "$public_key" "$secret_list"
       - name: Deploy final Worker with stable commit identity
-        run: npx --yes wrangler@4.33.1 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
+        run: npx --yes wrangler@4.127.0 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
       - name: Smoke test production routes
         env:
-          OPSTRUTH_EXPECTED_VERSION: 0.3.1
+          OPSTRUTH_EXPECTED_VERSION: 0.4.0
           OPSTRUTH_EXPECTED_COMMIT: ${{ github.sha }}
           OPSTRUTH_PRODUCTION_URL: https://opstruth-chatgpt.woeinvests.workers.dev
         run: npm run smoke:production

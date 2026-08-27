@@ -95,6 +95,23 @@ async function validateExamples() {
   return exampleNames.length;
 }
 
+async function validateEvidenceSchemas() {
+  const expected = new Map([
+    ["evidence-graph.schema.json", "urn:opstruth:schema:evidence-graph:1.0.0"],
+    ["evidence-delta.schema.json", "urn:opstruth:schema:evidence-delta:1.0.0"],
+  ]);
+  const failures = [];
+  for (const [name, id] of expected) {
+    const schema = JSON.parse(await readFile(join(root, "schemas", name), "utf8"));
+    if (schema.$id !== id) failures.push(`${name}: stable schema id mismatch`);
+    if (schema.additionalProperties !== false) failures.push(`${name}: top-level unknown fields must fail closed`);
+    if (schema.properties?.schemaVersion?.const !== "1.0.0") failures.push(`${name}: schema version mismatch`);
+    if (!schema.required?.includes("digest")) failures.push(`${name}: canonical digest is required`);
+  }
+  if (failures.length) throw new Error(failures.join("\n"));
+  return expected.size;
+}
+
 function semanticErrors(examples) {
   const errors = [];
   const request = examples.get("opstruth.action-request");
@@ -154,7 +171,8 @@ function semanticErrors(examples) {
 if (basename(process.argv[1] || "") === "validate-contracts.mjs") {
   try {
     const count = await validateExamples();
-    console.log(`contract validation passed: ${count} structural examples`);
+    const evidenceSchemas = await validateEvidenceSchemas();
+    console.log(`contract validation passed: ${count} structural examples, ${evidenceSchemas} evidence schemas`);
   } catch (error) {
     console.error(error.message);
     process.exit(1);

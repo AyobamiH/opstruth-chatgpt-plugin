@@ -27,6 +27,11 @@
       {
         "assertionId": "route.health.exists",
         "description": "The health route exists in source and returns an allowed status from the bound deployment.",
+        "target": {
+          "nodeType": "runtime_observation",
+          "field": "status",
+          "match": { "path": "/health" }
+        },
         "predicate": "status_in",
         "expected": [200, 204],
         "evidenceRequirements": ["commit", "deployment", "runtime_observation"]

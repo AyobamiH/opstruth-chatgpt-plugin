@@ -1,10 +1,10 @@
 # OpsTruth for ChatGPT and Codex
 
-OpsTruth is an evidence-first repository verification plugin. It combines focused workflow skills, a read-only MCP server, deterministic GitHub repository inspection, current public CI evidence, bounded HTTPS deployment probes, capability routing, signed evidence receipts, AgentProof verification and an optional evidence report UI.
+OpsTruth is an evidence-first repository verification plugin. Version 0.4.0 adds Evidence Graph v1: deterministic subject binding across repositories, commits, CI, runtime observations and execution receipts, plus portable signed snapshots, offline verification, state deltas and contradiction preservation.
 
 The public release accepts public GitHub repository URLs and explicitly supplied public HTTPS deployment URLs. It does not clone repositories, execute project code, install packages, read private repositories, deploy projects or mutate target systems. Fresh execution is represented by an approval-gated handoff contract for a separately connected isolated runner.
 
-Usage analytics are privacy-safe and aggregate-only. The Worker records tool name, outcome, latency, version and a coarse client family in Cloudflare Analytics Engine. It never records prompts, repository names, URLs, IPs or user identifiers. See `docs/release-readiness.md` for owner-only queries and the limitations of estimating ChatGPT usage.
+Usage analytics are privacy-safe and aggregate-only. The Worker records bounded tool, outcome, verdict, count, source-presence, signing, latency, version and coarse client-family fields. Optional feedback records only a controlled reason code and surface. It never records prompts, repository names, URLs, IPs, graph contents, receipts, free text or user identifiers. See `docs/release-readiness.md` for owner-only queries and the limitations of estimating ChatGPT usage.
 
 ## Architecture
 
@@ -27,6 +27,8 @@ The permanent architecture and 0.4.0 direction are defined in:
 
 An ActionRequest grants no authority. An ExecutionReceipt is a signed claim, not proof that the requested outcome occurred. Post-execution success requires fresh, independent, subject-bound verification.
 
+Evidence Graph snapshots are stateless and caller-held. Their signatures prove integrity and signer key possession, while signer trust, freshness, authorisation and outcome correctness remain separate decisions.
+
 ## Tool surface
 
 - `opstruth_inspect_repository`
@@ -44,6 +46,9 @@ An ActionRequest grants no authority. An ExecutionReceipt is a signed claim, not
 - `opstruth_plan_workflow`
 - `opstruth_verify_receipt`
 - `opstruth_verify_evidence_receipt`
+- `opstruth_snapshot_evidence`
+- `opstruth_compare_snapshots`
+- `opstruth_verify_execution_result`
 - `opstruth_render_evidence`
 
 ## Local verification

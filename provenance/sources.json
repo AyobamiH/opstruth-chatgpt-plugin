@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "generatedFor": "opstruth-chatgpt-plugin@0.3.1",
+  "generatedFor": "opstruth-chatgpt-plugin@0.4.0",
   "sources": [
     {
       "repository": "https://github.com/AyobamiH/opstruth",
@@ -63,9 +63,10 @@
     }
   ],
   "deferred": [
-    "Private GitHub OAuth",
+    "Production private GitHub read access and OAuth token broker",
     "AgentProof-authorized repository writes",
     "Authenticated sandbox execution behind the published runner handoff contract",
-    "Provider deployment actions"
+    "Provider-authenticated deployment verification and deployment actions",
+    "Managed Evidence Graph history and RAG"
   ]
 }

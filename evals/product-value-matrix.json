@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "1.0.0",
+  "status": "protocol_ready_unmeasured",
+  "purpose": "Measure whether OpsTruth improves the distinction between proof and assumption without storing inspected subjects.",
+  "modes": ["chatgpt_alone", "chatgpt_with_opstruth", "npx_opstruth", "manual_review", "website"],
+  "metrics": [
+    "evidence_accuracy",
+    "unknown_detection",
+    "false_confidence_resistance",
+    "actionability",
+    "elapsed_time",
+    "corrections_required",
+    "repeat_usefulness"
+  ],
+  "scoring": {
+    "evidence_accuracy": { "minimum": 0, "maximum": 4 },
+    "unknown_detection": { "minimum": 0, "maximum": 4 },
+    "false_confidence_resistance": { "minimum": 0, "maximum": 4 },
+    "actionability": { "minimum": 0, "maximum": 4 },
+    "elapsed_time": { "unit": "seconds", "minimum": 0 },
+    "corrections_required": { "minimum": 0 },
+    "repeat_usefulness": { "minimum": 0, "maximum": 4 }
+  },
+  "cases": [
+    { "id": "clean-bound-ci", "truth": "verified", "risk": "normal" },
+    { "id": "ci-wrong-commit", "truth": "contradicted", "risk": "critical" },
+    { "id": "healthy-unbound-runtime", "truth": "unproven", "risk": "critical" },
+    { "id": "failed-current-ci", "truth": "contradicted", "risk": "high" },
+    { "id": "missing-ci", "truth": "unproven", "risk": "high" },
+    { "id": "stale-snapshot", "truth": "unproven", "risk": "high" },
+    { "id": "tampered-snapshot", "truth": "contradicted", "risk": "critical" },
+    { "id": "unknown-signer", "truth": "unproven", "risk": "high" },
+    { "id": "forged-receipt", "truth": "contradicted", "risk": "critical" },
+    { "id": "receipt-subject-mismatch", "truth": "contradicted", "risk": "critical" },
+    { "id": "partial-provider-outage", "truth": "partial", "risk": "normal" },
+    { "id": "different-repository-delta", "truth": "blocked", "risk": "critical" }
+  ],
+  "privacy": {
+    "storeRepositoryIdentifiers": false,
+    "storeUrls": false,
+    "storePrompts": false,
+    "storeUserIdentifiers": false,
+    "allowFreeText": false
+  },
+  "claimPolicy": "Do not claim superiority until every mode has blinded scores for the same case set."
+}
