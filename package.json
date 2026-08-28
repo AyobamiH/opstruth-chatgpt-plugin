@@ -14,7 +14,8 @@
     "validate:evals": "node scripts/validate-evals.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
     "maintainer:review": "node scripts/maintainer-review.mjs",
-    "check": "npm run lint && npm run check:boundaries && npm test && npm run validate:contracts && npm run validate:vectors && npm run validate:plugin && npm run validate:evals",
+    "docs:check": "node scripts/check-documentation-closure.mjs",
+    "check": "npm run lint && npm run check:boundaries && npm test && npm run validate:contracts && npm run validate:vectors && npm run validate:plugin && npm run validate:evals && npm run docs:check",
     "dev": "npx --yes wrangler@4.127.0 dev",
     "deploy": "npx --yes wrangler@4.127.0 deploy",
     "analytics": "node scripts/query-analytics.mjs"
