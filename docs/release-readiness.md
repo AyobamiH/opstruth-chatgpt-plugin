@@ -16,7 +16,8 @@ OpsTruth binds public repository, commit, CI, optional runtime and caller-suppli
 - Runtime schema validation for graphs and all four execution-handoff artifacts.
 - Real cryptographic vectors verified by the runtime implementation and a standalone verifier.
 - Independent post-execution verification with separate authorizer, executor and verifier identities and role-specific trust allowlists.
-- Three additive read-only MCP tools: snapshot, compare and verify execution result.
+- Fail-closed DoneState v2 handoff validation, exact-commit re-observation and domain-separated Ed25519 attestation signing.
+- Five additive read-only MCP tools: snapshot, compare, verify execution result, expose the public verifier identity and attest DoneState handoff.
 - Canonical compatibility locks for all sixteen 0.3.1 public tool contracts.
 - Analytics v2 and optional reason-coded feedback with no subject, prompt, URL, receipt, graph, free-text or user identifiers.
 - Controlled five-mode product-value evaluation protocol. Results remain explicitly unmeasured until the comparison is run.
@@ -40,7 +41,7 @@ OpsTruth binds public repository, commit, CI, optional runtime and caller-suppli
 - Wrangler produces a deployable Worker bundle.
 - Pull-request CI and contents-read maintainer review pass on the exact head commit.
 - Post-merge CI and Cloudflare deployment pass on the exact main commit.
-- `/health` reports version `0.4.0`, 19 tools, Evidence Graph `1.0.0` and the exact deployed commit.
+- `/health` reports version `0.4.0`, 21 tools, Evidence Graph `1.0.0` and the exact deployed commit.
 - `/mcp`, `/signing-key`, `/privacy`, `/terms`, `/support` and reason-coded feedback are freshly checked.
 
 ## Publication separation

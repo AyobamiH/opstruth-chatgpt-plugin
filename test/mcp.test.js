@@ -10,7 +10,7 @@ test("MCP initialization advertises tools and resources", async () => {
   const initialized = await handleRpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, request, {}, {});
   assert.equal(initialized.result.serverInfo.name, "opstruth");
   const listed = await handleRpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, request, {}, {});
-  assert.equal(listed.result.tools.length, 19);
+  assert.equal(listed.result.tools.length, 21);
   assert.ok(listed.result.tools.every((tool) => tool.annotations.readOnlyHint === true));
   const resources = await handleRpc({ jsonrpc: "2.0", id: 3, method: "resources/list" }, request, {}, {});
   assert.equal(resources.result.resources[0].uri, "ui://opstruth/evidence-v1.html");
@@ -64,7 +64,7 @@ test("worker serves health and policy routes", async () => {
   const health = await worker.fetch(new Request("https://example.test/health"), { OPSTRUTH_BUILD_COMMIT: "abc123" }, {});
   assert.equal(health.status, 200);
   const healthBody = await health.json();
-  assert.equal(healthBody.tools, 19);
+  assert.equal(healthBody.tools, 21);
   assert.equal(healthBody.evidenceGraph, "1.0.0");
   assert.equal(healthBody.commit, "abc123");
   for (const path of ["/privacy", "/terms", "/support"]) {
@@ -253,7 +253,7 @@ test("MCP independently verifies an executor receipt against fresh GitHub eviden
           trusted_executor_fingerprints: [chain.receipt.proof.signerFingerprint],
         },
       },
-    }, request, chain.verifierEnv, {});
+    }, request, chain.verifierEnv, {}, { observedAt: "2026-08-27T12:10:00Z" });
     assert.equal(response.result.structuredContent.result.verdict, "VERIFIED");
     assert.equal(response.result.structuredContent.result.proof.signerFingerprint === chain.receipt.proof.signerFingerprint, false);
   } finally {

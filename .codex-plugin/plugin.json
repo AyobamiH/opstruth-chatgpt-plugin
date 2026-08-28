@@ -16,7 +16,7 @@
     "logo": "./assets/logo-mark.png",
     "composerIcon": "./assets/logo-mark.png",
     "shortDescription": "Verify coding work with proof",
-    "longDescription": "OpsTruth inspects public GitHub repositories, reads current public CI evidence, probes user-supplied HTTPS health endpoints, binds observations into portable signed Evidence Graphs, compares state snapshots, and independently verifies execution receipts without changing target projects.",
+    "longDescription": "OpsTruth inspects public GitHub repositories, reads current public CI evidence, probes user-supplied HTTPS health endpoints, binds observations into portable signed Evidence Graphs, compares state snapshots, independently verifies execution receipts, and signs sealed DoneState v2 verification handoffs without changing target projects.",
     "developerName": "AYOBAMI JOHN HAASTRUP",
     "category": "Developer Tools",
     "website": "https://opstruth-chatgpt.woeinvests.workers.dev",

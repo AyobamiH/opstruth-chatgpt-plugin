@@ -532,3 +532,116 @@ export function declaredEnvironmentNames(snapshot) {
   }
   return unique(names).sort();
 }
+
+function assertCommitSha(value, label) {
+  if (!/^[a-f0-9]{40}$/i.test(String(value || ""))) throw new Error(`${label}_invalid`);
+}
+
+function assertVerificationPath(value) {
+  const path = String(value || "");
+  if (!path || path.length > 500 || path.startsWith("/") || path.includes("\\")
+    || path.split("/").some((part) => !part || part === "..")) throw new Error("verification_path_invalid");
+  return path;
+}
+
+export async function loadCommitVerificationEvidence({ repository: input, baseSha, headSha, paths: requestedPaths = [] }, env = {}, ctx = {}) {
+  const repository = parseRepository(input);
+  assertCommitSha(baseSha, "base_sha");
+  assertCommitSha(headSha, "head_sha");
+  const paths = [...new Set(requestedPaths.map(assertVerificationPath))].sort();
+  if (paths.length > 20) throw new Error("verification_path_limit_exceeded");
+  const metadata = await githubApi(`/repos/${repository.owner}/${repository.repo}`, ctx, env);
+  if (metadata.private) throw new Error("Private repositories require a future authenticated lane");
+  const encodedHead = encodeURIComponent(headSha);
+  const encodedBase = encodeURIComponent(baseSha);
+  const [commitResult, treeResult, compareResult, checksResult, statusResult] = await Promise.all([
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}`, ctx, env),
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/git/trees/${encodedHead}?recursive=1`, ctx, env),
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/compare/${encodedBase}...${encodedHead}`, ctx, env),
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/check-runs?per_page=100`, ctx, env),
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/status`, ctx, env),
+  ]);
+  const tree = Array.isArray(treeResult.value?.tree)
+    ? bounded(treeResult.value.tree, MAX_TREE_ENTRIES).map(({ path, type, size, sha }) => ({ path, type, size: size || 0, sha }))
+    : [];
+  const byPath = new Map(tree.map((entry) => [entry.path, entry]));
+  const files = [];
+  let totalBytes = 0;
+  for (let index = 0; index < paths.length; index += 10) {
+    const batch = await Promise.all(paths.slice(index, index + 10).map(async (path) => {
+      const entry = byPath.get(path);
+      if (!entry || entry.type !== "blob" || Number(entry.size || 0) > MAX_FILE_BYTES || unsafeToRead(path)) return null;
+      return fetchRawFile(repository, headSha, entry);
+    }));
+    for (const file of batch.filter(Boolean)) {
+      const bytes = new TextEncoder().encode(file.text).byteLength;
+      if (totalBytes + bytes > MAX_TOTAL_BYTES) break;
+      files.push(file);
+      totalBytes += bytes;
+    }
+  }
+  const changedFiles = Array.isArray(compareResult.value?.files)
+    ? compareResult.value.files.slice(0, 300).map((file) => ({
+      path: file.filename,
+      status: file.status || null,
+      additions: Number(file.additions || 0),
+      deletions: Number(file.deletions || 0),
+      changes: Number(file.changes || 0),
+      blobUrl: file.blob_url || null,
+    }))
+    : [];
+  const checkRuns = Array.isArray(checksResult.value?.check_runs)
+    ? checksResult.value.check_runs.slice(0, 100).map((run) => ({
+      name: run.name || "Unnamed check",
+      status: run.status || null,
+      conclusion: run.conclusion || null,
+      htmlUrl: run.html_url || null,
+    }))
+    : [];
+  const contexts = Array.isArray(statusResult.value?.statuses)
+    ? statusResult.value.statuses.slice(0, 100).map((status) => ({
+      name: status.context || "Unnamed status",
+      state: status.state || null,
+      targetUrl: status.target_url || null,
+    }))
+    : [];
+  return {
+    repository: {
+      fullName: metadata.full_name,
+      providerRepositoryId: metadata.id === undefined || metadata.id === null ? null : String(metadata.id),
+      htmlUrl: metadata.html_url,
+      visibility: metadata.visibility,
+    },
+    subject: {
+      baseSha: baseSha.toLowerCase(),
+      headSha: headSha.toLowerCase(),
+      commitAvailable: commitResult.available,
+      observedHeadSha: commitResult.value?.sha?.toLowerCase() || null,
+      commitUrl: commitResult.value?.html_url || `https://github.com/${repository.fullName}/commit/${headSha}`,
+    },
+    tree: {
+      available: treeResult.available,
+      complete: treeResult.available && !treeResult.value?.truncated && tree.length < MAX_TREE_ENTRIES,
+      paths: tree.map((entry) => entry.path),
+      reason: treeResult.reason,
+    },
+    files,
+    compare: {
+      available: compareResult.available,
+      status: compareResult.value?.status || null,
+      aheadBy: Number(compareResult.value?.ahead_by ?? -1),
+      behindBy: Number(compareResult.value?.behind_by ?? -1),
+      files: changedFiles,
+      complete: compareResult.available && changedFiles.length < 300,
+      htmlUrl: `https://github.com/${repository.fullName}/compare/${baseSha}...${headSha}`,
+      reason: compareResult.reason,
+    },
+    checks: {
+      available: checksResult.available || statusResult.available,
+      checkRuns,
+      contexts,
+      combinedState: statusResult.value?.state || null,
+      reason: checksResult.reason || statusResult.reason,
+    },
+  };
+}

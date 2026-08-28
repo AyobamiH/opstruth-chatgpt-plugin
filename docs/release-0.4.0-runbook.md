@@ -16,7 +16,7 @@ Merge only with the expected PR head SHA. Record the resulting main commit. Neve
 
 The main-branch workflow deploys the Worker with the main commit identity. Require green post-merge CI and deployment, then independently check:
 
-- `/health`: version 0.4.0, 19 tools, Evidence Graph 1.0.0 and exact commit;
+- `/health`: version 0.4.0, 21 tools, Evidence Graph 1.0.0 and exact commit;
 - `/mcp`: successful initialisation and complete read-only tool list;
 - `/signing-key`: configured Ed25519 identity;
 - `/privacy`, `/terms` and `/support`: HTTP 200;
@@ -30,4 +30,3 @@ Roll back to the last verified Worker version when any boundary, compatibility, 
 ## 6. OpenAI publication
 
 Upload and submit the 0.4.0 plugin snapshot only after production verification. OpenAI review and directory publication remain distinct. Confirm the visible directory version before announcing publication.
-

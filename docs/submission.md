@@ -2,7 +2,7 @@
 - Product: OpsTruth
 - Version: 0.4.0
 - Publisher: AYOBAMI JOHN HAASTRUP
-- Submission shape: six skills, nineteen read-only MCP tools and optional evidence UI
+- Submission shape: six skills, twenty-one read-only MCP tools and optional evidence UI
 - MCP URL: https://opstruth-chatgpt.woeinvests.workers.dev/mcp
 - Authentication: none
 - Data scope: public GitHub repositories, explicitly supplied public HTTPS endpoints and caller-held protocol artifacts
@@ -30,7 +30,7 @@ Private repository credentials, write authority, provider deployment actions and
 ## Submission checks
 
 1. Run `npm run check` and the production smoke suite.
-2. Confirm 19 tools and six skills are returned from the exact production commit.
+2. Confirm 21 tools and six skills are returned from the exact production commit.
 3. Exercise snapshot, comparison, tamper rejection and post-execution verification paths.
 4. Confirm the privacy page describes graphs, protocol artifacts, analytics v2 and feedback.
 5. Submit the 0.4.0 package for OpenAI review.

@@ -6,7 +6,7 @@ import { recordFeedbackEvent, recordToolEvent, summarizeToolResult } from "./ana
 import { PLUGIN_VERSION } from "./version.js";
 
 const SERVER = { name: "opstruth", version: PLUGIN_VERSION };
-const INSTRUCTIONS = "Use OpsTruth for evidence-first public GitHub and user-supplied HTTPS health checks. Inspect before broad audits and prefer the narrowest matching tool. Use signed Evidence Graph snapshots when repository, commit, CI and optional runtime observations must be bound to one subject; compare only compatible caller-held snapshots. Verify execution outcomes only from a complete request, authorisation and receipt chain with separate authoritative authorizer and executor fingerprint allowlists, and never infer success from the receipt state. Never ask for credentials, infer build success from static files or mutate the target. Use the render tool only after a data tool returns a final report.";
+const INSTRUCTIONS = "Use OpsTruth for evidence-first public GitHub and user-supplied HTTPS health checks. Inspect before broad audits and prefer the narrowest matching tool. Use signed Evidence Graph snapshots when repository, commit, CI and optional runtime observations must be bound to one subject; compare only compatible caller-held snapshots. Verify execution outcomes only from a complete request, authorisation and receipt chain with separate authoritative authorizer and executor fingerprint allowlists, and never infer success from the receipt state. For DoneState, attest only a sealed v2 handoff and return the signed result for separate submission; OpsTruth never calls DoneState or changes its run. Never ask for credentials, infer build success from static files or mutate the target. Use the render tool only after a data tool returns a final report.";
 
 function rpcResult(id, result) {
   return { jsonrpc: "2.0", id, result };
@@ -16,7 +16,7 @@ function rpcError(id, code, message, data) {
   return { jsonrpc: "2.0", id: id ?? null, error: { code, message, ...(data ? { data } : {}) } };
 }
 
-async function handleRpc(payload, request, env, ctx) {
+async function handleRpc(payload, request, env, ctx, options = {}) {
   if (!payload || payload.jsonrpc !== "2.0" || typeof payload.method !== "string") {
     return rpcError(payload?.id, -32600, "Invalid Request");
   }
@@ -42,7 +42,7 @@ async function handleRpc(payload, request, env, ctx) {
     if (!params.name || typeof params.name !== "string") return rpcError(id, -32602, "Tool name required");
     const started = Date.now();
     try {
-      const toolResult = await callTool(params.name, params.arguments || {}, env, ctx);
+      const toolResult = await callTool(params.name, params.arguments || {}, env, ctx, options);
       const response = rpcResult(id, toolResult);
       recordToolEvent(env, ctx, request, { tool: params.name, outcome: "success", status: 200, latencyMs: Date.now() - started, ...summarizeToolResult(toolResult) });
       return response;
@@ -134,6 +134,7 @@ async function fetchHandler(request, env, ctx) {
       configured: signing.configured,
       algorithm: signing.algorithm,
       signerFingerprint: signing.signerFingerprint,
+      doneStateSignerFingerprint: signing.signerFingerprint?.replace(/^sha256:/, "") || null,
       publicKeyPem: signing.publicKeyPem,
     }, signing.configured ? 200 : 503);
   }
