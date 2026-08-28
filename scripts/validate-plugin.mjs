@@ -34,8 +34,8 @@ for (const name of skillNames) {
 
 const toolNames = TOOL_DEFINITIONS.map((tool) => tool.name);
 if (new Set(toolNames).size !== toolNames.length) errors.push("tool names must be unique");
-if (TOOL_DEFINITIONS.length !== 19) errors.push(`expected 19 tools, found ${TOOL_DEFINITIONS.length}`);
-const openWorldTools = new Set(["opstruth_probe_deployment", "opstruth_snapshot_evidence", "opstruth_verify_execution_result"]);
+if (TOOL_DEFINITIONS.length !== 21) errors.push(`expected 21 tools, found ${TOOL_DEFINITIONS.length}`);
+const openWorldTools = new Set(["opstruth_probe_deployment", "opstruth_snapshot_evidence", "opstruth_verify_execution_result", "opstruth_attest_donestate_handoff"]);
 for (const tool of TOOL_DEFINITIONS) {
   if (tool.annotations?.readOnlyHint !== true) errors.push(`${tool.name}: must be read-only`);
   if (tool.annotations?.destructiveHint !== false) errors.push(`${tool.name}: destructive annotation mismatch`);

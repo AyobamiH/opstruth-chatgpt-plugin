@@ -47,6 +47,15 @@
       "modifiedUpstream": false
     },
     {
+      "repository": "https://github.com/AyobamiH/donestate",
+      "commit": "f15e49c3db5c4e14bcb597f9c3dae3340d6cf490",
+      "version": "0.2.0-preview",
+      "license": "Apache-2.0",
+      "role": "DoneState v2 verification handoff, attestation schemas, trust bindings and portable compatibility vector",
+      "integration": "independent read-only verifier adapter",
+      "modifiedUpstream": false
+    },
+    {
       "repository": "https://github.com/AyobamiH/openclaw-operator",
       "commit": "15d2e8c141a5",
       "license": "not imported",

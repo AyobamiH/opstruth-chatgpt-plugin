@@ -1,6 +1,6 @@
 # OpsTruth for ChatGPT and Codex
 
-OpsTruth is an evidence-first repository verification plugin. Version 0.4.0 adds Evidence Graph v1: deterministic subject binding across repositories, commits, CI, runtime observations and execution receipts, plus portable signed snapshots, offline verification, state deltas and contradiction preservation.
+OpsTruth is an evidence-first repository verification plugin. Version 0.4.0 adds Evidence Graph v1: deterministic subject binding across repositories, commits, CI, runtime observations and execution receipts, plus portable signed snapshots, offline verification, state deltas, contradiction preservation and a fail-closed DoneState v2 attestation bridge.
 
 The public release accepts public GitHub repository URLs and explicitly supplied public HTTPS deployment URLs. It does not clone repositories, execute project code, install packages, read private repositories, deploy projects or mutate target systems. Fresh execution is represented by an approval-gated handoff contract for a separately connected isolated runner.
 
@@ -31,6 +31,7 @@ Evidence Graph snapshots are stateless and caller-held. Their signatures prove i
 
 ## Tool surface
 
+- `opstruth_get_verifier_identity`
 - `opstruth_inspect_repository`
 - `opstruth_audit_repository`
 - `opstruth_trace_routes`
@@ -49,6 +50,7 @@ Evidence Graph snapshots are stateless and caller-held. Their signatures prove i
 - `opstruth_snapshot_evidence`
 - `opstruth_compare_snapshots`
 - `opstruth_verify_execution_result`
+- `opstruth_attest_donestate_handoff`
 - `opstruth_render_evidence`
 
 ## Local verification
