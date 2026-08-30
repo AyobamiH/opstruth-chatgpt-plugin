@@ -148,7 +148,7 @@ async function validateHandoff(handoff, now) {
   }
 }
 
-function result(requirement, verdict, explanation, evidenceRefs = [], observed = null) {
+function result(requirement, verdict, explanation, evidenceRefs = [], observed = null, reasonCode = null) {
   return {
     requirementId: requirement.id,
     criterionIndex: requirement.criterionIndex,
@@ -157,6 +157,7 @@ function result(requirement, verdict, explanation, evidenceRefs = [], observed =
     observed,
     evidenceRefs: [...new Set(evidenceRefs)].sort(),
     explanation,
+    ...(reasonCode ? { reasonCode } : {}),
   };
 }
 
@@ -226,13 +227,20 @@ function evaluateRequirement(requirement, evidence) {
       ? requirement.requiredNames.map((name) => available.find((item) => item.name === name) || { name, state: "missing", ref: null })
       : available;
     const refs = selected.map((item) => item.ref).filter(Boolean);
-    if (!evidence.checks.available || !selected.length || selected.some((item) => ["missing", "queued", "in_progress", "pending", null].includes(item.state))) {
-      return result(requirement, "UNPROVEN", "One or more sealed GitHub checks are unavailable or incomplete.", refs, selected.map(({ name, state }) => ({ name, state })));
+    const observed = selected.map(({ name, state }) => ({ name, state }));
+    if (!evidence.checks.available) {
+      return result(requirement, "UNPROVEN", "The exact-commit GitHub checks were unavailable.", refs, observed, "github_checks_unavailable");
     }
-    const failed = selected.filter((item) => !["success", "neutral", "skipped"].includes(item.state));
+    if (!selected.length || selected.some((item) => item.state === "missing")) {
+      return result(requirement, "UNPROVEN", "One or more exact required GitHub check names were unavailable.", refs, observed, "github_checks_missing");
+    }
+    if (selected.some((item) => ["queued", "in_progress", "pending", null].includes(item.state))) {
+      return result(requirement, "UNPROVEN", "One or more exact required GitHub checks were still pending.", refs, observed, "github_checks_pending");
+    }
+    const failed = selected.filter((item) => item.state !== "success");
     return failed.length
-      ? result(requirement, "CONTRADICTED", "One or more sealed GitHub checks did not pass.", refs, failed.map(({ name, state }) => ({ name, state })))
-      : result(requirement, "VERIFIED", "Every sealed GitHub check passed for the exact commit.", refs, selected.map(({ name, state }) => ({ name, state })));
+      ? result(requirement, "CONTRADICTED", "One or more exact required GitHub checks ended without success.", refs, failed.map(({ name, state }) => ({ name, state })), "github_checks_terminal_failure")
+      : result(requirement, "VERIFIED", "Every exact required GitHub check completed successfully for the sealed commit.", refs, observed, "github_checks_satisfied");
   }
   return result(requirement, "UNPROVEN", "The verification requirement kind is unsupported.", [commitRef]);
 }
