@@ -16,4 +16,6 @@ The bridge consumes `donestate.verification-handoff.v2` and emits `donestate.ver
 
 Supported requirements are `path_exists`, `path_absent`, `file_contains`, `json_equals`, `changed_files` and `github_checks_pass`. The bridge reads at most twenty explicitly sealed files, retains no response bodies after the invocation and never accepts credentials through tool input.
 
+For `github_checks_pass`, OpsTruth reads check runs and commit statuses freshly for the sealed `subject.headSha`; volatile check state is never served from the five-minute repository cache. Required names are matched exactly. A requirement is `VERIFIED` only when every exact required check is terminal with `success`, `UNPROVEN` while evidence is unavailable, missing or pending, and `CONTRADICTED` for every other terminal conclusion. Each outcome carries a machine-readable `github_checks_*` reason code.
+
 The returned attestation is not submitted automatically. DoneState separately checks the pinned signer fingerprint, run ID, execution snapshot digest, verification nonce, handoff digest, report digest, issuance time and signature before changing state.

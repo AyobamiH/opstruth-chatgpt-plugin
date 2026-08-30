@@ -65,10 +65,10 @@ function githubHeaders(env = {}) {
   return headers;
 }
 
-async function githubApi(path, ctx, env = {}) {
+async function githubApi(path, ctx, env = {}, options = {}) {
   const headers = githubHeaders(env);
   const request = new Request(`https://api.github.com${path}`, { headers });
-  const response = await cachedFetch(request, ctx);
+  const response = options.fresh ? await fetch(request) : await cachedFetch(request, ctx);
   if (!response.ok) {
     if (response.status === 404) throw new Error("Repository was not found or is not public");
     if (response.status === 403 && response.headers.get("x-ratelimit-remaining") === "0") {
@@ -86,9 +86,9 @@ async function githubApi(path, ctx, env = {}) {
   }
 }
 
-async function optionalGithubApi(path, ctx, env = {}) {
+async function optionalGithubApi(path, ctx, env = {}, options = {}) {
   try {
-    return { available: true, value: await githubApi(path, ctx, env), reason: null };
+    return { available: true, value: await githubApi(path, ctx, env, options), reason: null };
   } catch (error) {
     return { available: false, value: null, reason: error?.code === "GITHUB_RATE_LIMIT" ? "rate_limited" : error.message };
   }
@@ -558,8 +558,8 @@ export async function loadCommitVerificationEvidence({ repository: input, baseSh
     optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}`, ctx, env),
     optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/git/trees/${encodedHead}?recursive=1`, ctx, env),
     optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/compare/${encodedBase}...${encodedHead}`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/check-runs?per_page=100`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/status`, ctx, env),
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/check-runs?per_page=100`, ctx, env, { fresh: true }),
+    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/status`, ctx, env, { fresh: true }),
   ]);
   const tree = Array.isArray(treeResult.value?.tree)
     ? bounded(treeResult.value.tree, MAX_TREE_ENTRIES).map(({ path, type, size, sha }) => ({ path, type, size: size || 0, sha }))

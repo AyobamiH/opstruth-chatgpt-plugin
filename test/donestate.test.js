@@ -54,8 +54,12 @@ async function handoff(overrides = {}) {
   };
 }
 
-function installFetchMock(readme = "# DoneState\nProof & State execution with independent OpsTruth verification.") {
+function installFetchMock(
+  readme = "# DoneState\nProof & State execution with independent OpsTruth verification.",
+  checkStates = [{ status: "completed", conclusion: "success" }],
+) {
   const original = globalThis.fetch;
+  let checkRequest = 0;
   globalThis.fetch = async (request) => {
     const url = new URL(typeof request === "string" ? request : request.url);
     if (url.hostname === "api.github.com" && url.pathname === "/repos/Example/project") {
@@ -77,7 +81,9 @@ function installFetchMock(readme = "# DoneState\nProof & State execution with in
       ] });
     }
     if (url.hostname === "api.github.com" && url.pathname === `/repos/Example/project/commits/${HEAD}/check-runs`) {
-      return Response.json({ total_count: 1, check_runs: [{ name: "CI", status: "completed", conclusion: "success", html_url: "https://github.com/Example/project/actions/runs/1" }] });
+      const state = checkStates[Math.min(checkRequest, checkStates.length - 1)];
+      checkRequest += 1;
+      return Response.json({ total_count: 1, check_runs: [{ name: "CI", ...state, html_url: "https://github.com/Example/project/actions/runs/1" }] });
     }
     if (url.hostname === "api.github.com" && url.pathname === `/repos/Example/project/commits/${HEAD}/status`) {
       return Response.json({ state: "success", statuses: [] });
@@ -87,6 +93,29 @@ function installFetchMock(readme = "# DoneState\nProof & State execution with in
     return new Response("unexpected", { status: 500 });
   };
   return () => { globalThis.fetch = original; };
+}
+
+function installCacheMock() {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "caches");
+  const values = new Map();
+  Object.defineProperty(globalThis, "caches", {
+    configurable: true,
+    value: {
+      default: {
+        async match(request) {
+          const response = values.get(request.url);
+          return response ? response.clone() : undefined;
+        },
+        async put(request, response) {
+          values.set(request.url, response.clone());
+        },
+      },
+    },
+  });
+  return () => {
+    if (previous) Object.defineProperty(globalThis, "caches", previous);
+    else delete globalThis.caches;
+  };
 }
 
 async function signatureValid(attestation) {
@@ -111,6 +140,37 @@ test("OpsTruth independently verifies and signs an exact DoneState v2 handoff", 
     assert.ok(verification.report.requirementResults.every((item) => item.verdict === "VERIFIED"));
     assert.equal(verification.attestation.decision, "verified");
     assert.equal(await signatureValid(verification.attestation), true);
+  } finally {
+    restore();
+  }
+});
+
+test("OpsTruth refreshes exact-head GitHub checks between pending and successful verification attempts", async () => {
+  const restoreFetch = installFetchMock(undefined, [
+    { status: "in_progress", conclusion: null },
+    { status: "completed", conclusion: "success" },
+  ]);
+  const restoreCache = installCacheMock();
+  try {
+    const pending = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    assert.equal(pending.report.decision, "uncertain");
+    assert.equal(pending.report.requirementResults[2].reasonCode, "github_checks_pending");
+
+    const successful = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    assert.equal(successful.report.decision, "verified");
+    assert.equal(successful.report.requirementResults[2].reasonCode, "github_checks_satisfied");
+  } finally {
+    restoreCache();
+    restoreFetch();
+  }
+});
+
+test("OpsTruth treats a terminal non-success GitHub check as failed", async () => {
+  const restore = installFetchMock(undefined, [{ status: "completed", conclusion: "neutral" }]);
+  try {
+    const verification = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    assert.equal(verification.report.decision, "failed");
+    assert.equal(verification.report.requirementResults[2].reasonCode, "github_checks_terminal_failure");
   } finally {
     restore();
   }

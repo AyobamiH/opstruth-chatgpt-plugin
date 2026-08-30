@@ -22,6 +22,12 @@ The owned-domain deployment completed through PR #7. Production smoke passed aga
 
 The prior verified production baseline remains part of the audit trail: source `255bab7b55b9f6587e3534d3b2afbacb2eed7321`, deployment workflow `33210945478`. It is superseded as the current deployment but not deleted from historical evidence.
 
+## Active DoneState verification incident
+
+Fresh canary `b4242932-0bc1-4876-a202-634d9c12d72a` remains `AWAITING_VERIFICATION` at DoneState PR #22, exact head `ffec48e6c5abd9cef840ab591896613769d3e779`. The three sealed checks later became publicly visible as successful, but the latest signed OpsTruth decision remained `uncertain`.
+
+Source inspection confirms that OpsTruth already addressed the sealed head SHA. The observed retry sequence instead overlapped the shared five-minute cache for volatile GitHub check responses, so a pending observation could outlive the provider-side transition to success. The remediation candidate bypasses that cache for exact-commit checks and statuses, requires exact-name `completed/success` outcomes, adds `github_checks_*` reason codes and includes a pending-to-success regression test. This is not recorded as deployed or as a successful canary rerun until exact-commit CI, merge, deployment and a new signed DoneState result are directly observed.
+
 ## Maintainer automation
 
 Maintainer bot v0 is active only in this source repository. It has contents-read authority, runs deterministic review evidence, and cannot approve, merge, deploy, sign verification results for its own change, or modify inspected targets.
