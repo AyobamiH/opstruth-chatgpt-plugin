@@ -66,3 +66,5 @@ npm run check
 The canonical production endpoint is `https://mcp.opstruth.io/mcp`. The `workers.dev` hostname remains enabled as a temporary compatibility surface.
 
 The current evidence-signing identity is exposed at `https://mcp.opstruth.io/signing-key`. The deployment workflow provisions the Ed25519 private key as a Cloudflare Worker secret and never commits it.
+
+Deployment receipts for the owned MCP domain are indexed in [Owned-domain cutover evidence](docs/OWNED-DOMAIN-CUTOVER.md).
