@@ -29,7 +29,7 @@ for (const name of skillNames) {
   if (!skill.startsWith("---\nname:")) errors.push(`${name}: invalid SKILL.md frontmatter`);
   if (!skill.includes(`name: ${name}\n`)) errors.push(`${name}: folder and frontmatter name differ`);
   if (!/description: .{30,}/.test(skill)) errors.push(`${name}: description is missing or too short`);
-  if (!agent.includes("https://opstruth-chatgpt.woeinvests.workers.dev/mcp")) errors.push(`${name}: MCP dependency missing`);
+  if (!agent.includes("https://mcp.opstruth.io/mcp")) errors.push(`${name}: MCP dependency missing`);
 }
 
 const toolNames = TOOL_DEFINITIONS.map((tool) => tool.name);

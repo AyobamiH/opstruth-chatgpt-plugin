@@ -1,4 +1,4 @@
-const endpoint = String(process.env.OPSTRUTH_PRODUCTION_URL || "https://opstruth-chatgpt.woeinvests.workers.dev").replace(/\/$/, "");
+const endpoint = String(process.env.OPSTRUTH_PRODUCTION_URL || "https://mcp.opstruth.io").replace(/\/$/, "");
 const expectedVersion = process.env.OPSTRUTH_EXPECTED_VERSION || "0.4.0";
 const expectedCommit = process.env.OPSTRUTH_EXPECTED_COMMIT || null;
 const expectedTools = 21;

@@ -54,5 +54,5 @@ jobs:
         env:
           OPSTRUTH_EXPECTED_VERSION: 0.4.0
           OPSTRUTH_EXPECTED_COMMIT: ${{ github.sha }}
-          OPSTRUTH_PRODUCTION_URL: https://opstruth-chatgpt.woeinvests.workers.dev
+          OPSTRUTH_PRODUCTION_URL: https://mcp.opstruth.io
         run: npm run smoke:production

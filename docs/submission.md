@@ -3,7 +3,7 @@
 - Version: 0.4.0
 - Publisher: AYOBAMI JOHN HAASTRUP
 - Submission shape: six skills, twenty-one read-only MCP tools and optional evidence UI
-- MCP URL: https://opstruth-chatgpt.woeinvests.workers.dev/mcp
+- MCP URL: https://mcp.opstruth.io/mcp
 - Authentication: none
 - Data scope: public GitHub repositories, explicitly supplied public HTTPS endpoints and caller-held protocol artifacts
 - Target-system writes: none
