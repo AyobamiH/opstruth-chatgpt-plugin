@@ -8,4 +8,4 @@ dependencies:
       value: "opstruth"
       description: "Read-only change-risk and authority planning tools"
       transport: "streamable_http"
-      url: "https://opstruth-chatgpt.woeinvests.workers.dev/mcp"
+      url: "https://mcp.opstruth.io/mcp"

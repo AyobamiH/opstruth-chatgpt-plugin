@@ -6,7 +6,8 @@ As of 2026-08-28, OpsTruth `0.4.0` is the deployed and directory-published indep
 
 - deployed Worker source commit: `255bab7b55b9f6587e3534d3b2afbacb2eed7321`
 - deployment workflow: `https://github.com/AyobamiH/opstruth-chatgpt-plugin/actions/runs/33210945478` (`success`)
-- endpoint: `https://opstruth-chatgpt.woeinvests.workers.dev/mcp`
+- canonical endpoint: `https://mcp.opstruth.io/mcp`
+- compatibility endpoint: `https://opstruth-chatgpt.woeinvests.workers.dev/mcp`
 - public tool count: 21
 - authority mode: read-only public evidence
 - signer fingerprint: `sha256:09544c3ede70b832a114918bb439960004655faf9d36981e1402587af9429c86`

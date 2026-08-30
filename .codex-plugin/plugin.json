@@ -4,9 +4,9 @@
   "description": "Bind repository, CI, runtime and receipt evidence into signed graphs without changing target systems.",
   "author": {
     "name": "AYOBAMI JOHN HAASTRUP",
-    "url": "https://opstruth-chatgpt.woeinvests.workers.dev"
+    "url": "https://opstruth.io"
   },
-  "homepage": "https://opstruth-chatgpt.woeinvests.workers.dev",
+  "homepage": "https://opstruth.io",
   "repository": "https://github.com/AyobamiH/opstruth-chatgpt-plugin",
   "license": "MIT",
   "logo": "./assets/logo-mark.png",
@@ -19,9 +19,9 @@
     "longDescription": "OpsTruth inspects public GitHub repositories, reads current public CI evidence, probes user-supplied HTTPS health endpoints, binds observations into portable signed Evidence Graphs, compares state snapshots, independently verifies execution receipts, and signs sealed DoneState v2 verification handoffs without changing target projects.",
     "developerName": "AYOBAMI JOHN HAASTRUP",
     "category": "Developer Tools",
-    "website": "https://opstruth-chatgpt.woeinvests.workers.dev",
-    "privacyPolicy": "https://opstruth-chatgpt.woeinvests.workers.dev/privacy",
-    "termsOfService": "https://opstruth-chatgpt.woeinvests.workers.dev/terms",
-    "support": "https://opstruth-chatgpt.woeinvests.workers.dev/support"
+    "website": "https://opstruth.io",
+    "privacyPolicy": "https://mcp.opstruth.io/privacy",
+    "termsOfService": "https://mcp.opstruth.io/terms",
+    "support": "https://mcp.opstruth.io/support"
   }
 }

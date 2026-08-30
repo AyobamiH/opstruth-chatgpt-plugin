@@ -19,6 +19,6 @@ Ask: “Bind this repository, current CI and health endpoint into one signed sna
 ## Links
 
 - Plugin: https://github.com/AyobamiH/opstruth-chatgpt-plugin
-- MCP: https://opstruth-chatgpt.woeinvests.workers.dev/mcp
-- Privacy: https://opstruth-chatgpt.woeinvests.workers.dev/privacy
-- Support: https://opstruth-chatgpt.woeinvests.workers.dev/support
+- MCP: https://mcp.opstruth.io/mcp
+- Privacy: https://mcp.opstruth.io/privacy
+- Support: https://mcp.opstruth.io/support
