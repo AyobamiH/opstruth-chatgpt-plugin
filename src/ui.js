@@ -8,24 +8,26 @@ export const EVIDENCE_UI_HTML = `
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>OpsTruth evidence</title>
   <style>
-    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, sans-serif; }
-    body { margin: 0; background: #08111f; color: #e7eef9; }
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; --background:#0d0f10; --surface:#131618; --surface-elevated:#191c1f; --foreground:#eceeef; --muted:#a0a5aa; --border:#2b2f32; --border-strong:#3a3f43; --pass:#76b995; }
+    body { margin: 0; background: var(--background); color: var(--foreground); }
     main { padding: 18px; }
     header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     h1 { font-size: 20px; margin: 0; }
-    .badge { border: 1px solid #34506f; border-radius: 999px; padding: 4px 9px; color: #9bd3ff; font-size: 12px; }
+    .badge { border: 1px solid var(--border-strong); border-radius: 999px; padding: 4px 9px; color: var(--pass); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
     .grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin: 16px 0; }
-    .card { background: #101d2f; border: 1px solid #243b58; border-radius: 12px; padding: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 12px; }
     .value { font-size: 24px; font-weight: 750; }
-    .label { color: #94a7bd; font-size: 12px; }
-    h2 { font-size: 14px; color: #b9cce2; margin: 18px 0 8px; }
+    .label { color: var(--muted); font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; }
+    h2 { font-size: 14px; color: var(--muted); margin: 18px 0 8px; }
     ul { margin: 0; padding-left: 20px; }
     li { margin: 6px 0; line-height: 1.35; }
     .warning { color: #ffd58a; }
     .failure { color: #ff9f9f; }
-    .muted { color: #94a7bd; }
+    .muted { color: var(--muted); }
     .feedback { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-    button { background: #162944; color: #d8e9fb; border: 1px solid #34506f; border-radius: 9px; padding: 7px 10px; cursor: pointer; }
+    button { background: var(--surface-elevated); color: var(--foreground); border: 1px solid var(--border-strong); border-radius: 7px; padding: 7px 10px; cursor: pointer; }
+    button:hover { background: var(--surface); }
+    button:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
     button:disabled { cursor: default; opacity: .55; }
     @media (max-width: 520px) { .grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
   </style>
