@@ -11,6 +11,10 @@
   "observability": {
     "enabled": true
   },
+  "vars": {
+    "OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY": "AyobamiH/donestate",
+    "OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY_ID": "1348643925"
+  },
   "analytics_engine_datasets": [
     { "binding": "OPSTRUTH_ANALYTICS", "dataset": "opstruth_usage" }
   ]

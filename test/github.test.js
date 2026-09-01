@@ -11,6 +11,24 @@ test("repository parser accepts only public github identifiers", () => {
   assert.throws(() => parseRepository("../../etc/passwd"), /Repository must be/);
 });
 
+test("general public repository audits remain anonymous even when a legacy token is present", async () => {
+  const restore = installGithubFetchMock();
+  const fixtureFetch = globalThis.fetch;
+  const apiAuthorizations = [];
+  globalThis.fetch = async (request) => {
+    const url = new URL(typeof request === "string" ? request : request.url);
+    if (url.hostname === "api.github.com") apiAuthorizations.push(request.headers.get("authorization"));
+    return fixtureFetch(request);
+  };
+  try {
+    await loadRepositorySnapshot("Example/project", { GITHUB_READ_TOKEN: "legacy-token-must-not-be-used" });
+    assert.ok(apiAuthorizations.length > 0);
+    assert.ok(apiAuthorizations.every((value) => value === null));
+  } finally {
+    restore();
+  }
+});
+
 test("snapshot and audits remain bounded and redact secret values", async () => {
   const restore = installGithubFetchMock();
   try {

@@ -16,6 +16,8 @@ Usage analytics are privacy-safe and aggregate-only. The Worker records bounded 
 
 OpsTruth deliberately separates observation from mutation. Private systems may later be inspected through brokered least-privilege read access. Repository writes, remediation, deployment, and other target mutation belong to separately authorised executors. OpsTruth then independently verifies the resulting state.
 
+The DoneState exact-commit bridge has a separate verifier-owned GitHub App read lane for the single reviewed public repository. It uses short-lived installation credentials internally; callers cannot select its scope or submit credentials. General public-repository audit tools remain anonymous. See [GitHub App verification read lane](docs/github-app-verification.md).
+
 The permanent architecture and 0.4.0 direction are defined in:
 
 - `docs/architecture/BOUNDARIES.md`: authority constitution and non-mutation invariant;
@@ -66,5 +68,7 @@ npm run check
 The canonical production endpoint is `https://mcp.opstruth.io/mcp`. The `workers.dev` hostname remains enabled as a temporary compatibility surface.
 
 The current evidence-signing identity is exposed at `https://mcp.opstruth.io/signing-key`. The deployment workflow provisions the Ed25519 private key as a Cloudflare Worker secret and never commits it.
+
+GitHub App credentials are owner-provisioned Cloudflare Worker secrets. The deployment workflow verifies only their presence, and production health discloses only the authentication mode, configuration boolean and selected-public-repository scope.
 
 Deployment receipts for the owned MCP domain are indexed in [Owned-domain cutover evidence](docs/OWNED-DOMAIN-CUTOVER.md).
