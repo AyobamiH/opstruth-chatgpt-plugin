@@ -2,6 +2,8 @@ import { canonicalJson } from "./canonical.js";
 import { loadCommitVerificationEvidence } from "./github.js";
 import { pemBytes, sha256, signingMetadata } from "./utils.js";
 
+export const DONESTATE_VERIFICATION_CONTRACT_VERSION = "donestate.verification-contract.v2";
+
 const HANDOFF_DOMAIN = "donestate.verification-handoff.v2\0";
 const REPORT_DOMAIN = "opstruth.donestate-verification-report.v1\0";
 const ATTESTATION_DOMAIN = "donestate.verification-attestation.v2\0";
@@ -332,5 +334,5 @@ export async function verifyDoneStateHandoff(handoff, env = {}, ctx = {}, option
       signatureBase64: encodeBase64(signature),
     },
   };
-  return { report, attestation };
+  return { contractVersion: DONESTATE_VERIFICATION_CONTRACT_VERSION, report, attestation };
 }

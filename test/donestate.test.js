@@ -174,6 +174,8 @@ test("OpsTruth independently verifies and signs an exact DoneState v2 handoff", 
   const restore = installFetchMock();
   try {
     const verification = await verifyDoneStateHandoff(await handoff(), verificationEnv(), {}, { observedAt: OBSERVED_AT });
+    assert.deepEqual(Object.keys(verification).sort(), ["attestation", "contractVersion", "report"]);
+    assert.equal(verification.contractVersion, "donestate.verification-contract.v2");
     assert.equal(verification.report.decision, "verified");
     assert.ok(verification.report.requirementResults.every((item) => item.verdict === "VERIFIED"));
     assert.equal(verification.attestation.decision, "verified");
@@ -246,6 +248,7 @@ test("MCP exposes the DoneState bridge without submitting the attestation", asyn
   const restore = installFetchMock();
   try {
     const response = await callTool("opstruth_attest_donestate_handoff", { handoff: await handoff() }, verificationEnv(), {});
+    assert.equal(response.structuredContent.contractVersion, "donestate.verification-contract.v2");
     assert.equal(response.structuredContent.report.decision, "verified");
     assert.match(response.content[0].text, /attestation was not submitted/);
   } finally {
