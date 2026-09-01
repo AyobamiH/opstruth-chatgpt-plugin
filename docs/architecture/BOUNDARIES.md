@@ -110,6 +110,10 @@ A receipt is a signed claim. Signature verification proves integrity and signer 
 
 OpsTruth MUST independently re-observe the requested assertions before returning `VERIFIED` after an execution. When re-observation is incomplete, the result MUST be `PARTIAL`, `CONTRADICTED`, or `UNPROVEN`.
 
+Capability-specific evidence reviews MUST report bounded coverage. For migration inspection this includes discovered, inspected, and omitted paths, deterministic file and byte limits, and an omission reason. A truncated tree, unreadable path, or exhausted capability budget cannot produce complete, high-confidence, or verified migration wording.
+
+Provider API availability is an observation, not a success verdict. GitHub workflow, check-run, and combined-status evidence is verified only when it is nonempty, successful, and bound to the exact observed head. Pending, missing, neutral, skipped, cancelled, stale-head, failing, and context-free signals remain unproven or risky.
+
 ## Portable state and privacy
 
 OpsTruth 0.4.0 remains stateless by default. Longitudinal comparison is based on signed, portable snapshots supplied by the caller or retrieved through a separately approved storage design.

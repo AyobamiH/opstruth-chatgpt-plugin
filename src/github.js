@@ -6,6 +6,9 @@ const MAX_TREE_ENTRIES = 20000;
 const MAX_FILES = 30;
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+const MAX_MIGRATION_FILES = 12;
+const MAX_MIGRATION_TOTAL_BYTES = 2 * 1024 * 1024;
+const MAX_COVERAGE_PATHS = 100;
 const MAX_GITHUB_API_BYTES = 16 * 1024 * 1024;
 const MAX_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
@@ -135,6 +138,34 @@ function selectFiles(tree) {
     .filter((entry) => priority(entry.path) > 0)
     .sort((left, right) => priority(right.path) - priority(left.path) || left.path.localeCompare(right.path))
     .slice(0, MAX_FILES);
+}
+
+function isMigrationPath(path) {
+  return /(?:^|\/)migrations?\//i.test(path) || /migration/i.test(path.split("/").at(-1) || "");
+}
+
+function coverageList(paths) {
+  const sorted = [...paths].sort();
+  return { count: sorted.length, paths: sorted.slice(0, MAX_COVERAGE_PATHS), pathsTruncated: sorted.length > MAX_COVERAGE_PATHS };
+}
+
+function migrationCoverage(tree, files, omissions, treeTruncated, limitations = []) {
+  const discoveredPaths = tree.filter((entry) => entry.type === "blob" && isMigrationPath(entry.path)).map((entry) => entry.path);
+  const inspectedPaths = files.map((file) => file.path);
+  const sortedOmissions = [...omissions].sort((left, right) => left.path.localeCompare(right.path) || left.reason.localeCompare(right.reason));
+  return {
+    complete: !treeTruncated && sortedOmissions.length === 0 && inspectedPaths.length === discoveredPaths.length,
+    treeComplete: !treeTruncated,
+    limits: { maxFiles: MAX_MIGRATION_FILES, maxFileBytes: MAX_FILE_BYTES, maxTotalBytes: MAX_MIGRATION_TOTAL_BYTES },
+    discovered: coverageList(discoveredPaths),
+    inspected: coverageList(inspectedPaths),
+    omitted: {
+      count: sortedOmissions.length,
+      items: sortedOmissions.slice(0, MAX_COVERAGE_PATHS),
+      itemsTruncated: sortedOmissions.length > MAX_COVERAGE_PATHS,
+    },
+    limitations: [...new Set([...(treeTruncated ? ["tree_truncated"] : []), ...limitations])].sort(),
+  };
 }
 
 function tarString(bytes, start, length) {
@@ -301,6 +332,30 @@ async function loadArchiveSnapshot(repository, ctx) {
   if (!parsed.tree.length) throw new Error("GitHub archive did not contain a readable public repository tree");
   const lowerPaths = new Set(parsed.tree.map((entry) => entry.path.toLowerCase()));
 
+  const availableMigrationFiles = parsed.files.filter((file) => isMigrationPath(file.path)).sort((left, right) => left.path.localeCompare(right.path));
+  const migrationFiles = [];
+  const migrationOmissionReasons = new Map();
+  let migrationBytes = 0;
+  for (const file of availableMigrationFiles) {
+    if (migrationFiles.length >= MAX_MIGRATION_FILES) migrationOmissionReasons.set(file.path, "file_count_limit");
+    else {
+      const bytes = new TextEncoder().encode(file.text).byteLength;
+      if (migrationBytes + bytes > MAX_MIGRATION_TOTAL_BYTES) migrationOmissionReasons.set(file.path, "total_byte_limit");
+      else {
+        migrationFiles.push(file);
+        migrationBytes += bytes;
+      }
+    }
+  }
+  const migrationFilePaths = new Set(migrationFiles.map((file) => file.path));
+  const migrationOmissions = parsed.tree
+    .filter((entry) => entry.type === "blob" && isMigrationPath(entry.path) && !migrationFilePaths.has(entry.path))
+    .map((entry) => ({
+      path: entry.path,
+      reason: migrationOmissionReasons.get(entry.path)
+        || (Number(entry.size || 0) > MAX_FILE_BYTES ? "file_byte_limit" : "archive_fallback_not_selected"),
+    }));
+
   return {
     repository: {
       owner: repository.owner,
@@ -321,6 +376,10 @@ async function loadArchiveSnapshot(repository, ctx) {
     },
     tree: parsed.tree,
     files: parsed.files,
+    capabilityFiles: { migrations: migrationFiles },
+    capabilityCoverage: {
+      migrations: migrationCoverage(parsed.tree, migrationFiles, migrationOmissions, parsed.treeTruncated, ["archive_fallback_bounded_selection"]),
+    },
     limits: {
       treeEntriesObserved: parsed.tree.length,
       treeTruncated: parsed.treeTruncated,
@@ -356,6 +415,47 @@ async function fetchSelectedFiles(repository, branch, tree) {
     }
   }
   return files;
+}
+
+async function fetchMigrationCapability(repository, branch, tree, treeTruncated) {
+  const discovered = tree.filter((entry) => entry.type === "blob" && isMigrationPath(entry.path))
+    .sort((left, right) => left.path.localeCompare(right.path));
+  const omissions = [];
+  const eligible = [];
+  for (const entry of discovered) {
+    if (unsafeToRead(entry.path)) omissions.push({ path: entry.path, reason: "unsafe_path" });
+    else if (Number(entry.size || 0) > MAX_FILE_BYTES) omissions.push({ path: entry.path, reason: "file_byte_limit" });
+    else eligible.push(entry);
+  }
+  const selected = eligible.slice(0, MAX_MIGRATION_FILES);
+  for (const entry of eligible.slice(MAX_MIGRATION_FILES)) omissions.push({ path: entry.path, reason: "file_count_limit" });
+
+  const files = [];
+  let totalBytes = 0;
+  for (let index = 0; index < selected.length; index += 6) {
+    const batchEntries = selected.slice(index, index + 6);
+    const batch = await Promise.all(batchEntries.map(async (entry) => {
+      try {
+        return { entry, file: await fetchRawFile(repository, branch, entry), reason: null };
+      } catch {
+        return { entry, file: null, reason: "read_error" };
+      }
+    }));
+    for (const item of batch) {
+      if (!item.file) {
+        omissions.push({ path: item.entry.path, reason: item.reason || "unreadable" });
+        continue;
+      }
+      const bytes = new TextEncoder().encode(item.file.text).byteLength;
+      if (totalBytes + bytes > MAX_MIGRATION_TOTAL_BYTES) {
+        omissions.push({ path: item.entry.path, reason: "total_byte_limit" });
+        continue;
+      }
+      files.push(item.file);
+      totalBytes += bytes;
+    }
+  }
+  return { files, coverage: migrationCoverage(tree, files, omissions, treeTruncated) };
 }
 
 function unavailableGithubStatus(defaultBranch, reason) {
@@ -471,9 +571,11 @@ export async function loadRepositorySnapshot(input, env = {}, ctx = {}) {
   const branch = metadata.default_branch;
   const completeTree = Array.isArray(treePayload.tree) ? treePayload.tree : [];
   const tree = bounded(completeTree, MAX_TREE_ENTRIES).map(({ path, type, size, sha }) => ({ path, type, size: size || 0, sha }));
-  const [files, githubStatus] = await Promise.all([
+  const treeTruncated = Boolean(treePayload.truncated) || completeTree.length > MAX_TREE_ENTRIES;
+  const [files, githubStatus, migrationCapability] = await Promise.all([
     fetchSelectedFiles(repository, branch, tree),
     loadGithubStatus(repository, branch, ctx, env),
+    fetchMigrationCapability(repository, branch, tree, treeTruncated),
   ]);
   return {
     repository: {
@@ -494,10 +596,12 @@ export async function loadRepositorySnapshot(input, env = {}, ctx = {}) {
     },
     tree,
     files,
+    capabilityFiles: { migrations: migrationCapability.files },
+    capabilityCoverage: { migrations: migrationCapability.coverage },
     githubStatus,
     limits: {
       treeEntriesObserved: tree.length,
-      treeTruncated: Boolean(treePayload.truncated) || completeTree.length > MAX_TREE_ENTRIES,
+      treeTruncated,
       filesRead: files.length,
       maxFiles: MAX_FILES,
       maxFileBytes: MAX_FILE_BYTES,

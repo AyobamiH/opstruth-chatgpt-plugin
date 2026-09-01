@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { loadRepositorySnapshot, parseRepository } from "../src/github.js";
-import { auditSecrets, checkGithubHandoff, fullAudit, reviewApiContracts, traceRoutes } from "../src/audits.js";
-import { installGithubFetchMock, installRateLimitedGithubFetchMock } from "./fixtures.js";
+import { auditSecrets, checkGithubHandoff, fullAudit, reviewApiContracts, reviewMigrations, traceRoutes } from "../src/audits.js";
+import { installGithubFetchMock, installRateLimitedGithubFetchMock, repositoryTree } from "./fixtures.js";
 
 test("repository parser accepts only public github identifiers", () => {
   assert.equal(parseRepository("Example/project").fullName, "Example/project");
@@ -97,6 +97,113 @@ test("raw GitHub file responses are bounded before buffering", async () => {
   };
   try {
     await assert.rejects(loadRepositorySnapshot("Example/project"), /GitHub raw file exceeded the 1 MiB safety limit/);
+  } finally {
+    restore();
+  }
+});
+
+test("migration review uses a dedicated read set when generic selection is exhausted", async () => {
+  const restore = installGithubFetchMock();
+  const fixtureFetch = globalThis.fetch;
+  const migrationPath = "supabase/migrations/999_late.sql";
+  const crowdedTree = {
+    ...repositoryTree,
+    tree: [
+      { path: "package.json", type: "blob", size: 100, sha: "package" },
+      ...Array.from({ length: 35 }, (_, index) => ({ path: `services/${String(index).padStart(2, "0")}/wrangler.json`, type: "blob", size: 20, sha: `config-${index}` })),
+      { path: migrationPath, type: "blob", size: 80, sha: "migration" },
+    ],
+  };
+  globalThis.fetch = async (request) => {
+    const url = new URL(typeof request === "string" ? request : request.url);
+    if (url.hostname === "api.github.com" && url.pathname.includes("/git/trees/")) return Response.json(crowdedTree);
+    if (url.hostname === "raw.githubusercontent.com") {
+      const path = url.pathname.split("/").filter(Boolean).slice(3).map(decodeURIComponent).join("/");
+      if (path === migrationPath) return new Response("DROP TABLE accounts;");
+      if (path.endsWith("wrangler.json")) return new Response("{}");
+    }
+    return fixtureFetch(request);
+  };
+  try {
+    const snapshot = await loadRepositorySnapshot("Example/project");
+    assert.equal(snapshot.files.some((file) => file.path === migrationPath), false);
+    assert.equal(snapshot.capabilityFiles.migrations[0].path, migrationPath);
+    const review = reviewMigrations(snapshot);
+    assert.equal(review.status, "complete");
+    assert.equal(review.migrations.coverage.complete, true);
+    assert.equal(review.migrations.coverage.discovered.count, 1);
+    assert.equal(review.migrations.coverage.inspected.count, 1);
+    assert.deepEqual(review.migrations.riskIndicators, [{ kind: "drop-operation", path: migrationPath }]);
+  } finally {
+    restore();
+  }
+});
+
+test("migration cap exhaustion and truncated trees remain explicitly partial", async () => {
+  const restore = installGithubFetchMock();
+  const fixtureFetch = globalThis.fetch;
+  const migrationEntries = Array.from({ length: 13 }, (_, index) => ({
+    path: `migrations/${String(index).padStart(2, "0")}.sql`, type: "blob", size: 20, sha: `migration-${index}`,
+  }));
+  let truncated = false;
+  globalThis.fetch = async (request) => {
+    const url = new URL(typeof request === "string" ? request : request.url);
+    if (url.hostname === "api.github.com" && url.pathname.includes("/git/trees/")) {
+      return Response.json({ sha: "tree-migrations", truncated, tree: migrationEntries });
+    }
+    if (url.hostname === "raw.githubusercontent.com") return new Response("ALTER TABLE accounts ADD COLUMN note text;");
+    return fixtureFetch(request);
+  };
+  try {
+    const capped = reviewMigrations(await loadRepositorySnapshot("Example/project"));
+    assert.equal(capped.status, "partial");
+    assert.equal(capped.confidence.level, "low");
+    assert.equal(capped.migrations.coverage.inspected.count, 12);
+    assert.equal(capped.migrations.coverage.omitted.count, 1);
+    assert.equal(capped.migrations.coverage.omitted.items[0].reason, "file_count_limit");
+    assert.equal(capped.verified.some((item) => /migration coverage/i.test(item)), false);
+
+    truncated = true;
+    const incompleteTree = reviewMigrations(await loadRepositorySnapshot("Example/project"));
+    assert.equal(incompleteTree.status, "partial");
+    assert.equal(incompleteTree.migrations.coverage.treeComplete, false);
+    assert.ok(incompleteTree.migrations.coverage.limitations.includes("tree_truncated"));
+  } finally {
+    restore();
+  }
+});
+
+test("GitHub handoff verifies only successful exact-head signals", async () => {
+  const restore = installGithubFetchMock();
+  try {
+    const snapshot = await loadRepositorySnapshot("Example/project");
+    const passing = checkGithubHandoff(snapshot);
+    assert.equal(passing.githubHandoff.signalAssessments.workflowRuns.verdict, "VERIFIED");
+    assert.equal(passing.githubHandoff.signalAssessments.checkRuns.verdict, "VERIFIED");
+    assert.equal(passing.githubHandoff.signalAssessments.commitStatus.verdict, "VERIFIED");
+
+    const pending = structuredClone(snapshot);
+    pending.githubStatus.workflowRuns.latest[0].status = "in_progress";
+    pending.githubStatus.workflowRuns.latest[0].conclusion = null;
+    const pendingResult = checkGithubHandoff(pending);
+    assert.equal(pendingResult.githubHandoff.signalAssessments.workflowRuns.verdict, "UNPROVEN");
+    assert.equal(pendingResult.verified.includes("Exact-head public GitHub Actions success"), false);
+
+    const stale = structuredClone(snapshot);
+    stale.githubStatus.workflowRuns.latest[0].headSha = "2".repeat(40);
+    assert.equal(checkGithubHandoff(stale).githubHandoff.signalAssessments.workflowRuns.reason, "no_exact_head_workflow_runs");
+
+    const neutral = structuredClone(snapshot);
+    neutral.githubStatus.checkRuns.latest[0].conclusion = "neutral";
+    const neutralResult = checkGithubHandoff(neutral);
+    assert.equal(neutralResult.githubHandoff.signalAssessments.checkRuns.verdict, "RISKY");
+    assert.ok(neutralResult.failures.some((item) => item.includes("check-run")));
+
+    const contextFree = structuredClone(snapshot);
+    contextFree.githubStatus.commitStatus.contexts = [];
+    const contextFreeResult = checkGithubHandoff(contextFree);
+    assert.equal(contextFreeResult.githubHandoff.signalAssessments.commitStatus.verdict, "UNPROVEN");
+    assert.equal(contextFreeResult.verified.includes("Exact-head combined commit-status success"), false);
   } finally {
     restore();
   }
