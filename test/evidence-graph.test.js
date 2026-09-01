@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { generateKeyPairSync } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { canonicalDigest, withoutFields } from "../src/canonical.js";
 import { buildEvidenceGraph, compareEvidenceGraphs, detectContradictions, verifyEvidenceGraph } from "../src/evidence-graph.js";
 import { loadRepositorySnapshot } from "../src/github.js";
 import { signProtocolArtifact } from "../src/protocol.js";
@@ -33,12 +34,45 @@ test("Evidence Graph v1 is deterministic, schema-valid and independently verifia
     assert.deepEqual(first, second);
     assert.deepEqual(validateAgainstSchema(first, graphSchema), []);
     assert.equal(first.subject.repositoryId, "424242");
-    assert.equal(first.summary.verdict, "VERIFIED");
+    assert.equal(first.summary.verdict, "PARTIAL");
+    const scope = first.nodes.find((node) => node.type === "finding" && node.attributes?.kind === "assessment_scope");
+    assert.deepEqual(scope.attributes.assessed, ["ci_commit_binding", "repository_head", "repository_identity"]);
+    assert.ok(scope.attributes.notAssessed.includes("release_readiness"));
+    assert.equal(first.summary.assertionResults.find((item) => item.assertionId === "release.readiness")?.verdict, "UNPROVEN");
     const verification = await verifyEvidenceGraph(first, { trustedSignerFingerprints: [first.proof.signerFingerprint], now: "2026-08-27T12:00:01Z" });
     assert.equal(verification.valid, true);
     assert.equal(verification.signatureValid, true);
     assert.equal(verification.trusted, true);
+    assert.equal(verification.scopeIntegrity, "scoped");
+    assert.equal(verification.releaseReadiness, "UNPROVEN");
     assert.deepEqual(verification.staleNodeIds, []);
+  } finally {
+    restore();
+  }
+});
+
+test("legacy unscoped v1 snapshots remain integrity-verifiable without gaining release proof", async () => {
+  const restore = installGithubFetchMock();
+  try {
+    const env = signingEnv();
+    const legacy = structuredClone(await fixtureGraph(env));
+    const scopeIds = new Set(legacy.nodes.filter((node) => node.type === "finding" && node.attributes?.kind === "assessment_scope").map((node) => node.id));
+    legacy.nodes = legacy.nodes.filter((node) => !scopeIds.has(node.id));
+    legacy.edges = legacy.edges.filter((edge) => !scopeIds.has(edge.from) && !scopeIds.has(edge.to)
+      && !(edge.evidenceNodeIds || []).some((id) => scopeIds.has(id)));
+    legacy.summary.assertionResults = legacy.summary.assertionResults.filter((item) => item.assertionId !== "release.readiness");
+    legacy.summary.counts.unproven = legacy.summary.assertionResults.filter((item) => item.verdict === "UNPROVEN").length;
+    legacy.summary.counts.nodes = legacy.nodes.length;
+    legacy.summary.counts.edges = legacy.edges.length;
+    legacy.summary.verdict = "VERIFIED";
+    const graphIdPayload = withoutFields(legacy, ["graphId", "digest", "proof"]);
+    const graphIdDigest = await canonicalDigest("opstruth.evidence-graph-id.v1\0", graphIdPayload);
+    legacy.graphId = `urn:opstruth:evidence-graph:${graphIdDigest.slice("sha256:".length)}`;
+    const signedLegacy = await signProtocolArtifact(legacy, env);
+    const verification = await verifyEvidenceGraph(signedLegacy, { now: "2026-08-27T12:00:01Z" });
+    assert.equal(verification.valid, true);
+    assert.equal(verification.scopeIntegrity, "legacy_unscoped");
+    assert.equal(verification.releaseReadiness, "UNPROVEN");
   } finally {
     restore();
   }
@@ -83,8 +117,45 @@ test("compatible signed snapshots produce a deterministic delta", async () => {
     const second = await compareEvidenceGraphs(before, after, { comparedAt: "2026-08-27T12:06:00Z", trustedSignerFingerprints: [before.proof.signerFingerprint] });
     assert.deepEqual(first, second);
     assert.deepEqual(validateAgainstSchema(first, deltaSchema), []);
-    assert.ok(first.nodeChanges.changed.length > 0);
+    assert.deepEqual(first.nodeChanges, { added: [], removed: [], changed: [], stale: [] });
+    assert.deepEqual(first.edgeChanges, { added: [], removed: [], changed: [], stale: [] });
     assert.equal(first.nodeChanges.stale.length, 0);
+  } finally {
+    restore();
+  }
+});
+
+test("runtime observations with timestamp-derived ids compare semantically", async () => {
+  const restore = installGithubFetchMock();
+  try {
+    const env = signingEnv();
+    const snapshot = await loadRepositorySnapshot("Example/project", {}, {});
+    const deploymentReport = {
+      target: { environment: "production", deploymentId: "prod-1" },
+      probes: [{ requestedUrl: "https://example.com/health", finalUrl: "https://example.com/health", method: "GET", status: 200, ok: true }],
+    };
+    const before = await buildEvidenceGraph({ repositorySnapshot: snapshot, deploymentReport, observedAt: "2026-08-27T12:00:00Z", env });
+    const after = await buildEvidenceGraph({ repositorySnapshot: snapshot, deploymentReport, observedAt: "2026-08-27T12:04:00Z", env });
+    const delta = await compareEvidenceGraphs(before, after, { comparedAt: "2026-08-27T12:04:30Z", trustedSignerFingerprints: [before.proof.signerFingerprint] });
+    assert.deepEqual(delta.nodeChanges, { added: [], removed: [], changed: [], stale: [] });
+    assert.deepEqual(delta.edgeChanges, { added: [], removed: [], changed: [], stale: [] });
+  } finally {
+    restore();
+  }
+});
+
+test("semantic deltas still report a real current-CI change", async () => {
+  const restore = installGithubFetchMock();
+  try {
+    const env = signingEnv();
+    const snapshot = await loadRepositorySnapshot("Example/project", {}, {});
+    const before = await buildEvidenceGraph({ repositorySnapshot: snapshot, observedAt: "2026-08-27T12:00:00Z", env });
+    snapshot.githubStatus.workflowRuns.latest[0].conclusion = "failure";
+    const after = await buildEvidenceGraph({ repositorySnapshot: snapshot, observedAt: "2026-08-27T12:04:00Z", env });
+    const delta = await compareEvidenceGraphs(before, after, { comparedAt: "2026-08-27T12:04:30Z", trustedSignerFingerprints: [before.proof.signerFingerprint] });
+    assert.equal(delta.nodeChanges.changed.length, 1);
+    assert.match(delta.nodeChanges.changed[0], /:ci_run:/);
+    assert.deepEqual(delta.verdictTransition, { from: "PARTIAL", to: "CONTRADICTED" });
   } finally {
     restore();
   }

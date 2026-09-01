@@ -118,14 +118,14 @@ Examples of minimum subject identity:
 | CI run | Provider run ID plus head commit SHA |
 | Artifact | Producer run plus content digest |
 | Deployment | Provider deployment ID, environment, and deployed commit or artifact digest |
-| Runtime observation | Normalized origin, path, observation time, and declared environment |
+| Runtime observation | Normalized origin, path, and declared environment; observation time remains provenance rather than semantic identity |
 | Receipt | Schema version, payload digest, and signer fingerprint |
 
 A deployment that cannot be bound to a commit or artifact may be observed, but it cannot prove that the requested commit is live.
 
 ## Verdict model
 
-Graph-wide and assertion-level verdicts are:
+Graph-wide and assertion-level verdicts are scoped to the dimensions actually assessed:
 
 - `VERIFIED`: all required evidence is valid, fresh, and bound to the exact subject;
 - `PARTIAL`: some required assertions are verified and others are missing or stale;
@@ -133,6 +133,8 @@ Graph-wide and assertion-level verdicts are:
 - `UNPROVEN`: evidence is insufficient to establish the assertion.
 
 `RISKY` remains a report classification for exposed hazards. It is not a substitute for an evidence verdict.
+
+Every newly emitted v1 graph includes one signed `finding` node with `attributes.kind` set to `assessment_scope`. Its `assessed`, `notAssessed`, and deterministic `statement` fields prevent a repository-only observation from implying deployment, publication, migration, rollback, runtime correctness, or release readiness. A repository-only graph is therefore `PARTIAL` even when repository identity, exact head, and observed CI are verified. Legacy v1 graphs without this node remain integrity-verifiable, but their release-readiness interpretation is always `UNPROVEN`.
 
 ## Contradiction rules
 
@@ -151,14 +153,16 @@ Conflicting evidence must be retained in the graph. The implementation must not 
 
 An evidence snapshot is an immutable signed graph. A delta compares two valid snapshots and reports:
 
-- added, removed, changed, stale, and newly contradicted nodes;
+- semantically added, removed, changed, stale, and newly contradicted nodes;
 - added or removed subject bindings;
 - verdict transitions;
 - source or authority changes;
-- freshness changes;
+- freshness state at the comparison time;
 - assertions that can no longer be verified.
 
 The comparison operation must first validate both snapshot signatures, graph versions, subject compatibility, and canonical digests. A caller may compare unsigned snapshots, but the result must say that snapshot integrity is unverified.
+
+Material comparison uses stable semantic identities. Node and edge digests still retain observation and freshness timestamps for integrity, but timestamp-only re-observation does not create an added, removed, or changed item. Runtime observations match on their stable subject fields. Edge endpoints, evidence references, and contradiction membership are normalized through the same semantic node identities. A real status, verdict, source, subject, or relationship change remains material.
 
 ## Privacy and retention
 
@@ -186,8 +190,10 @@ Evidence Graph v1 is complete only when:
 5. Conflicting commit evidence returns `CONTRADICTED`.
 6. Signed snapshots can be verified without network access.
 7. Two compatible snapshots can produce a deterministic delta.
-8. No graph contents enter aggregate analytics.
-9. Existing 0.3.1 tools remain read-only and backward compatible.
+8. Timestamp-only re-observation produces no semantic change while real evidence changes remain visible.
+9. Repository-only evidence explicitly leaves release readiness unproven.
+10. No graph contents enter aggregate analytics.
+11. Existing 0.3.1 tools remain read-only and backward compatible.
 
 ## Implemented public operations
 

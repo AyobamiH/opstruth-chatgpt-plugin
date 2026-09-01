@@ -344,7 +344,9 @@ export async function callTool(name, args = {}, env = {}, ctx = {}, options = {}
       observedAt,
       env,
     });
-    return textResult(graph, `OpsTruth evidence snapshot: ${graph.summary.verdict}. ${graph.nodes.length} node(s), ${graph.edges.length} edge(s), no state changed.`);
+    const scopeStatement = graph.nodes.find((node) => node.type === "finding" && node.attributes?.kind === "assessment_scope")?.attributes?.statement
+      || "Release readiness remains unproven.";
+    return textResult(graph, `OpsTruth evidence snapshot: ${graph.summary.verdict}. ${scopeStatement} ${graph.nodes.length} node(s), ${graph.edges.length} edge(s), no state changed.`);
   }
   if (name === "opstruth_compare_snapshots") {
     const delta = await compareEvidenceGraphs(args.before, args.after, {
