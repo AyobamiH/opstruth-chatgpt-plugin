@@ -1,6 +1,6 @@
 # Current status
 
-As of 2026-08-30, OpsTruth `0.4.0` is the deployed and directory-published independent verification product on its owned service domain.
+As of 2026-09-01, OpsTruth `0.4.0` is the deployed and directory-published independent verification product on its owned service domain.
 
 ## Verified production identity
 
@@ -26,7 +26,7 @@ The prior verified production baseline remains part of the audit trail: source `
 
 Fresh canary `b4242932-0bc1-4876-a202-634d9c12d72a` remains `AWAITING_VERIFICATION` at DoneState PR #22, exact head `ffec48e6c5abd9cef840ab591896613769d3e779`. The three sealed checks later became publicly visible as successful, but the latest signed OpsTruth decision remained `uncertain`.
 
-Source inspection confirms that OpsTruth already addressed the sealed head SHA. The observed retry sequence instead overlapped the shared five-minute cache for volatile GitHub check responses, so a pending observation could outlive the provider-side transition to success. The remediation candidate bypasses that cache for exact-commit checks and statuses, requires exact-name `completed/success` outcomes, adds `github_checks_*` reason codes and includes a pending-to-success regression test. This is not recorded as deployed or as a successful canary rerun until exact-commit CI, merge, deployment and a new signed DoneState result are directly observed.
+Commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5` addressed the volatile-check cache and exact-name completion semantics. A later verification attempt on that deployed commit was still unable to finish because anonymous GitHub reads exhausted the shared public quota. [Issue #11](https://github.com/AyobamiH/opstruth-chatgpt-plugin/issues/11) therefore tracks a separate verifier-owned GitHub App lane restricted to the selected public DoneState repository. The implementation candidate removes static-token support, uses short-lived installation credentials and authenticated Contents reads, and fails closed on scope, revocation or quota limitations. It is not recorded as merged, configured, deployed or successfully canary-verified until human review, exact installation and secret checks, exact-commit deployment, and a new sealed run are directly observed. Historical run `b4242932-0bc1-4876-a202-634d9c12d72a` and PR #22 remain unchanged.
 
 ## Maintainer automation
 

@@ -18,9 +18,6 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -28,13 +25,32 @@ jobs:
           node-version: 24
       - run: npm run check
       - name: Require Cloudflare deployment secrets
+        env: &cloudflare-credentials
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN"
           test -n "$CLOUDFLARE_ACCOUNT_ID"
+      - name: Require verifier GitHub App Worker secrets
+        shell: bash
+        env: *cloudflare-credentials
+        run: |
+          set -euo pipefail
+          secret_list="$RUNNER_TEMP/opstruth-github-app-secret-list.json"
+          trap 'rm -f "$secret_list"' EXIT
+          npx --yes wrangler@4.127.0 secret list > "$secret_list"
+          for required in OPSTRUTH_GITHUB_APP_ID OPSTRUTH_GITHUB_APP_INSTALLATION_ID OPSTRUTH_GITHUB_APP_PRIVATE_KEY_PEM; do
+            if ! grep -Eq "\"name\"[[:space:]]*:[[:space:]]*\"$required\"" "$secret_list"; then
+              echo "::error::Required verifier GitHub App Worker secret is not configured: $required"
+              exit 1
+            fi
+          done
       - name: Deploy bootstrap Worker with commit identity
+        env: *cloudflare-credentials
         run: npx --yes wrangler@4.127.0 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
       - name: Provision stable evidence-signing key once
         shell: bash
+        env: *cloudflare-credentials
         run: |
           set -euo pipefail
           secret_list="$RUNNER_TEMP/opstruth-secret-list.json"
@@ -49,6 +65,7 @@ jobs:
           npx --yes wrangler@4.127.0 secret put OPSTRUTH_RECEIPT_PUBLIC_KEY_SPKI < "$public_key"
           rm -f "$private_key" "$public_key" "$secret_list"
       - name: Deploy final Worker with stable commit identity
+        env: *cloudflare-credentials
         run: npx --yes wrangler@4.127.0 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
       - name: Smoke test production routes
         env:

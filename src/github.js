@@ -1,5 +1,6 @@
 import { bounded, unique } from "./utils.js";
 import { PLUGIN_VERSION } from "./version.js";
+import { createGithubAppClient } from "./github-app.js";
 
 const MAX_TREE_ENTRIES = 20000;
 // Keep repository, status and file fetches below Cloudflare's per-invocation subrequest ceiling.
@@ -58,18 +59,16 @@ async function cachedFetch(request, ctx) {
   return response;
 }
 
-function githubHeaders(env = {}) {
-  const headers = {
+function githubHeaders() {
+  return {
     accept: "application/vnd.github+json",
     "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}`,
     "x-github-api-version": "2022-11-28",
   };
-  if (env?.GITHUB_READ_TOKEN) headers.authorization = `Bearer ${env.GITHUB_READ_TOKEN}`;
-  return headers;
 }
 
 async function githubApi(path, ctx, env = {}, options = {}) {
-  const headers = githubHeaders(env);
+  const headers = githubHeaders();
   const request = new Request(`https://api.github.com${path}`, { headers });
   const response = options.fresh ? await fetch(request) : await cachedFetch(request, ctx);
   if (!response.ok) {
@@ -648,41 +647,97 @@ function assertVerificationPath(value) {
   return path;
 }
 
+function githubAppObservationReason(error) {
+  if (error?.code === "GITHUB_APP_RATE_LIMIT") return "rate_limited";
+  if (["GITHUB_APP_AUTH_FAILED", "GITHUB_APP_NOT_CONFIGURED", "GITHUB_APP_CONFIGURATION_INVALID", "GITHUB_APP_TOKEN_INVALID"].includes(error?.code)) {
+    return "authentication_unavailable";
+  }
+  if (error?.code === "GITHUB_APP_PERMISSION_DENIED" || error?.code === "GITHUB_APP_SCOPE_INVALID") return "permission_denied";
+  if (error?.code === "GITHUB_APP_NOT_FOUND") return "not_found";
+  if (error?.code === "GITHUB_APP_RESPONSE_INVALID") return "provider_response_invalid";
+  return "github_verification_unavailable";
+}
+
+async function optionalGithubAppApi(client, path, options = {}) {
+  try {
+    return { available: true, value: await client.json(path, options), reason: null };
+  } catch (error) {
+    return { available: false, value: null, reason: githubAppObservationReason(error) };
+  }
+}
+
+function decodeContentsFile(payload, entry) {
+  if (payload === null) return null;
+  if (!payload || Array.isArray(payload) || payload.type !== "file" || payload.path !== entry.path
+    || payload.sha !== entry.sha || payload.encoding !== "base64" || Number(payload.size) > MAX_FILE_BYTES) {
+    const error = new Error("GitHub verification file response was invalid");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  const encoded = typeof payload.content === "string" ? payload.content.replace(/\s+/g, "") : "";
+  if (typeof payload.content !== "string" || encoded.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
+    const error = new Error("GitHub verification file response was invalid");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  let binary;
+  try {
+    binary = atob(encoded);
+  } catch {
+    const error = new Error("GitHub verification file response was invalid");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  if (binary.length > MAX_FILE_BYTES || Number(payload.size) !== binary.length) {
+    const error = new Error("GitHub verification file response exceeded its bound");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return { path: entry.path, text: decoder.decode(bytes), truncated: false };
+}
+
+async function fetchVerificationFile(client, repository, headSha, entry) {
+  const encodedPath = entry.path.split("/").map(encodeURIComponent).join("/");
+  const payload = await client.json(
+    `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/contents/${encodedPath}?ref=${encodeURIComponent(headSha)}`,
+    { allowNotFound: true },
+  );
+  return decodeContentsFile(payload, entry);
+}
+
 export async function loadCommitVerificationEvidence({ repository: input, baseSha, headSha, paths: requestedPaths = [] }, env = {}, ctx = {}) {
   const repository = parseRepository(input);
   assertCommitSha(baseSha, "base_sha");
   assertCommitSha(headSha, "head_sha");
   const paths = [...new Set(requestedPaths.map(assertVerificationPath))].sort();
   if (paths.length > 20) throw new Error("verification_path_limit_exceeded");
-  const metadata = await githubApi(`/repos/${repository.owner}/${repository.repo}`, ctx, env);
-  if (metadata.private) throw new Error("Private repositories require a future authenticated lane");
+  const client = createGithubAppClient(env, repository.fullName);
+  const repositoryPrefix = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`;
+  const metadata = await client.json(repositoryPrefix);
+  client.assertSelectedRepository(metadata);
   const encodedHead = encodeURIComponent(headSha);
   const encodedBase = encodeURIComponent(baseSha);
-  const [commitResult, treeResult, compareResult, checksResult, statusResult] = await Promise.all([
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/git/trees/${encodedHead}?recursive=1`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/compare/${encodedBase}...${encodedHead}`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/check-runs?per_page=100`, ctx, env, { fresh: true }),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/status`, ctx, env, { fresh: true }),
-  ]);
+  const commitResult = await optionalGithubAppApi(client, `${repositoryPrefix}/commits/${encodedHead}`);
+  const treeResult = await optionalGithubAppApi(client, `${repositoryPrefix}/git/trees/${encodedHead}?recursive=1`);
+  const compareResult = await optionalGithubAppApi(client, `${repositoryPrefix}/compare/${encodedBase}...${encodedHead}`);
+  const checksResult = await optionalGithubAppApi(client, `${repositoryPrefix}/commits/${encodedHead}/check-runs?per_page=100`);
+  const statusResult = await optionalGithubAppApi(client, `${repositoryPrefix}/commits/${encodedHead}/status`);
   const tree = Array.isArray(treeResult.value?.tree)
     ? bounded(treeResult.value.tree, MAX_TREE_ENTRIES).map(({ path, type, size, sha }) => ({ path, type, size: size || 0, sha }))
     : [];
   const byPath = new Map(tree.map((entry) => [entry.path, entry]));
   const files = [];
   let totalBytes = 0;
-  for (let index = 0; index < paths.length; index += 10) {
-    const batch = await Promise.all(paths.slice(index, index + 10).map(async (path) => {
-      const entry = byPath.get(path);
-      if (!entry || entry.type !== "blob" || Number(entry.size || 0) > MAX_FILE_BYTES || unsafeToRead(path)) return null;
-      return fetchRawFile(repository, headSha, entry);
-    }));
-    for (const file of batch.filter(Boolean)) {
-      const bytes = new TextEncoder().encode(file.text).byteLength;
-      if (totalBytes + bytes > MAX_TOTAL_BYTES) break;
-      files.push(file);
-      totalBytes += bytes;
-    }
+  for (const path of paths) {
+    const entry = byPath.get(path);
+    if (!entry || entry.type !== "blob" || Number(entry.size || 0) > MAX_FILE_BYTES || unsafeToRead(path)) continue;
+    const file = await fetchVerificationFile(client, repository, headSha, entry);
+    if (!file) continue;
+    const bytes = new TextEncoder().encode(file.text).byteLength;
+    if (totalBytes + bytes > MAX_TOTAL_BYTES) break;
+    files.push(file);
+    totalBytes += bytes;
   }
   const changedFiles = Array.isArray(compareResult.value?.files)
     ? compareResult.value.files.slice(0, 300).map((file) => ({
@@ -715,6 +770,7 @@ export async function loadCommitVerificationEvidence({ repository: input, baseSh
       providerRepositoryId: metadata.id === undefined || metadata.id === null ? null : String(metadata.id),
       htmlUrl: metadata.html_url,
       visibility: metadata.visibility,
+      evidenceAuthority: client.authority,
     },
     subject: {
       baseSha: baseSha.toLowerCase(),
