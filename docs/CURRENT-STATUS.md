@@ -1,37 +1,51 @@
 # Current status
 
-As of 2026-09-01, OpsTruth `0.4.0` is the deployed and directory-published independent verification product on its owned service domain.
+As of 2026-09-01, OpsTruth `0.4.0` is publicly visible in the OpenAI Plugins Directory and deployed on its owned MCP domain. The currently deployed source remains commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`; the P0 repair stack on PR #20 is not production evidence until it reaches `main`, deploys, and passes fresh read-back.
 
 ## Verified production identity
 
-- deployed Worker source commit: `915ab91110bddf520551b318723baac49213e33a`
-- pull-request CI: `https://github.com/AyobamiH/opstruth-chatgpt-plugin/actions/runs/33299933644` (`success`)
-- maintainer review: `https://github.com/AyobamiH/opstruth-chatgpt-plugin/actions/runs/33299933712` (`success`)
-- post-merge CI: `https://github.com/AyobamiH/opstruth-chatgpt-plugin/actions/runs/33300000121` (`success`)
-- deployment workflow: `https://github.com/AyobamiH/opstruth-chatgpt-plugin/actions/runs/33300000143` (`success`)
-- deployed Cloudflare version: `4a5ef5ed-fad8-48a4-9d2b-5eaeb4ad4bfe`
+- deployed Worker source commit: `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`
+- exact-main CI: `https://github.com/AyobamiH/opstruth-chatgpt-plugin/actions/runs/33341464435` (`success`)
+- exact-main deployment workflow: `https://github.com/AyobamiH/opstruth-chatgpt-plugin/actions/runs/33341464399` (`success`)
+- deployment-log Worker version: `811fe35d-34a2-444f-a36f-a8421931ade2`
 - canonical endpoint: `https://mcp.opstruth.io/mcp`
 - compatibility endpoint: `https://opstruth-chatgpt.woeinvests.workers.dev/mcp`
 - public tool count: 21
+- workflow skill count: 6
 - authority mode: read-only public evidence
 - signer fingerprint: `sha256:09544c3ede70b832a114918bb439960004655faf9d36981e1402587af9429c86`
 
-The DoneState v2 bridge is live. OpsTruth independently re-observed DoneState canary run `631d8a08-d337-4bae-bd18-b55c31f48a8b` and signed the verification report that allowed the separately authorised DoneState coordinator to record `VERIFIED`.
+The deployment workflow and public health read-back bind version `0.4.0`, 21 tools, Evidence Graph `1.0.0`, configured signing, and commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`. The Cloudflare provider control plane was not independently read during this reconciliation, so the active provider version remains an owner-side read-back gate.
 
-The owned-domain deployment completed through PR #7. Production smoke passed against `https://mcp.opstruth.io`, reporting version `0.4.0`, exact commit `915ab91110bddf520551b318723baac49213e33a`, 21 read-only tools, and a signed Evidence Graph. See [Owned-domain cutover evidence](OWNED-DOMAIN-CUTOVER.md).
+## Public channels
 
-The prior verified production baseline remains part of the audit trail: source `255bab7b55b9f6587e3534d3b2afbacb2eed7321`, deployment workflow `33210945478`. It is superseded as the current deployment but not deleted from historical evidence.
+- OpenAI Plugins Directory: public listing `OpsTruth`, version `0.4.0`, developer `AYOBAMI JOHN HAASTRUP`, direct listing `https://chatgpt.com/plugins/plugins_6a8d4dc60bf081918a06094873890eb4`.
+- OpenAI listing caveat: the visible metadata still links to the `workers.dev` compatibility origin. A clean-account install and real tool outcome remain unproven.
+- GitHub Marketplace: the separate `AyobamiH/opstruth` repository publishes the `OpsTruth evidence` Action at `v1.0.0`; `v1` and `v1.0.0` resolve to `45f4debbd3fbe8217599ab697b8f6c855b372e0b`.
+- Website channel: `opstruth.io` currently presents CLI version `0.2.0`, while the MCP and OpenAI channels present `0.4.0`. Channel-specific versions must be labelled and the website drift remains open.
 
-## Active DoneState verification incident
+The Marketplace Action is not a release of this plugin repository. This repository currently has no GitHub tag, GitHub release, or GitHub deployment record.
 
-Fresh canary `b4242932-0bc1-4876-a202-634d9c12d72a` remains `AWAITING_VERIFICATION` at DoneState PR #22, exact head `ffec48e6c5abd9cef840ab591896613769d3e779`. The three sealed checks later became publicly visible as successful, but the latest signed OpsTruth decision remained `uncertain`.
+## Active P0 repair program
 
-Commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5` addressed the volatile-check cache and exact-name completion semantics. A later verification attempt on that deployed commit was still unable to finish because anonymous GitHub reads exhausted the shared public quota. [Issue #11](https://github.com/AyobamiH/opstruth-chatgpt-plugin/issues/11) therefore tracks a separate verifier-owned GitHub App lane restricted to the selected public DoneState repository. The implementation candidate removes static-token support, uses short-lived installation credentials and authenticated Contents reads, and fails closed on scope, revocation or quota limitations. It is not recorded as merged, configured, deployed or successfully canary-verified until human review, exact installation and secret checks, exact-commit deployment, and a new sealed run are directly observed. Historical run `b4242932-0bc1-4876-a202-634d9c12d72a` and PR #22 remain unchanged.
+The open carrier PR #20 now contains the reconciled false-evidence repairs plus the stacked verifier work that was reviewed separately in #23 and #25. Until #20 reaches `main`, those changes remain candidate source rather than deployed truth.
 
-## Maintainer automation
+The carrier includes capability-specific migration completeness, exact-head GitHub outcome classification, scoped graph verdicts, the internal-versus-independent deployment smoke regression, a verifier-owned GitHub App read lane restricted to `AyobamiH/donestate`, and the complete `donestate.verification-contract.v2` response envelope with pinned shared vectors.
 
-Maintainer bot v0 is active only in this source repository. It has contents-read authority, runs deterministic review evidence, and cannot approve, merge, deploy, sign verification results for its own change, or modify inspected targets.
+## DoneState bridge state
 
-## Not implemented
+Historical DoneState run `631d8a08-d337-4bae-bd18-b55c31f48a8b` remains valid historical `VERIFIED` evidence. Historical run `b4242932-0bc1-4876-a202-634d9c12d72a` remains unproven and must not be rewritten or retroactively trusted.
 
-Private-repository evidence brokerage, managed longitudinal storage, a verifier fleet, and higher maintainer write stages remain deferred. OpsTruth does not execute repair, merge, deployment, or release actions.
+The candidate verifier lane uses short-lived installation credentials, authenticated exact-head Metadata/Contents/Checks/Commit-status reads, strict repository identity and scope checks, and no anonymous or static-token success fallback. The candidate bridge returns the strict `{ contractVersion, report, attestation }` response required by DoneState. Neither capability is recorded as production-ready until the carrier is independently reviewed, merged to `main`, the GitHub App is correctly installed/configured, the exact main commit deploys, and a new consequence-disabled sealed canary reaches terminal read-back.
+
+DoneState PR #22 was owner-merged without public terminal verifier evidence. That owner action does not widen OpsTruth authority and does not verify the historical canary.
+
+## Maintainer and release gates
+
+Maintainer bot v0 remains a deterministic, contents-read evidence source. It cannot approve, merge, deploy, release, or sign verification for its own change.
+
+`main` is currently unprotected, repository rulesets are not enforced, CODEOWNERS names only `@AyobamiH`, and no second trusted human reviewer is identified. Security, authentication, deployment, release, and evidence-contract changes require non-author human review before merge. A commit-bound tag and release must wait until the repaired deployed identity is reconciled to exact channel identities.
+
+## Deferred scope
+
+Private-repository evidence brokerage, managed longitudinal storage, a verifier fleet, and higher maintainer write stages remain deferred. OpsTruth does not execute repair, merge, deployment, or release actions against inspected systems.

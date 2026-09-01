@@ -36,6 +36,7 @@ export const EVIDENCE_UI_HTML = `
 <main>
   <header><h1>OpsTruth evidence</h1><span class="badge" id="status">Waiting</span></header>
   <p class="muted" id="repo">Run an OpsTruth evidence tool, then render its report.</p>
+  <p class="muted" id="scope"></p>
   <section class="grid">
     <div class="card"><div class="value" id="verifiedCount">0</div><div class="label">Verified</div></div>
     <div class="card"><div class="value" id="warningCount">0</div><div class="label">Warnings</div></div>
@@ -65,12 +66,14 @@ export const EVIDENCE_UI_HTML = `
     const graph = report.schema === 'opstruth.evidence-graph' ? report : report.evidenceGraph;
     const result = report.result || report;
     const assertions = graph?.summary?.assertionResults || result.assertionResults || [];
+    const scope = graph?.nodes?.find((node) => node.type === 'finding' && node.attributes?.kind === 'assessment_scope')?.attributes;
     const verified = report.verified || assertions.filter((item) => item.verdict === 'VERIFIED').map((item) => item.explanation);
     const warnings = report.warnings || result.warnings || (graph?.summary?.contradictions || []).map((item) => item.description);
     const failures = report.failures || result.errors || [];
     const gaps = report.notVerified || result.notVerified || assertions.filter((item) => item.verdict === 'UNPROVEN').map((item) => item.explanation);
     byId('status').textContent = graph?.summary?.verdict || result.verdict || report.status || 'complete';
     byId('repo').textContent = report.repository?.fullName || graph?.subject?.repositoryName || result.subject?.repositoryName || report.title || 'OpsTruth report';
+    byId('scope').textContent = scope?.statement || '';
     byId('verifiedCount').textContent = verified.length;
     byId('warningCount').textContent = warnings.length;
     byId('failureCount').textContent = failures.length;
