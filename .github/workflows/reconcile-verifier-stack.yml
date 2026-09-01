@@ -1,0 +1,48 @@
+name: Reconcile verifier stack with main
+
+on:
+  push:
+    branches:
+      - repair/repository-evidence-truth
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - name: Merge current main without publishing on conflict
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          if ! git merge --no-commit --no-ff origin/main; then
+            echo "Conflict files:"
+            git diff --name-only --diff-filter=U
+            git status --short
+            exit 2
+          fi
+      - name: Validate reconciled repository
+        run: |
+          npm run check
+          git diff --check
+      - name: Commit reconciled carrier
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --cached --quiet && git diff --quiet; then
+            echo "Carrier already contains current main"
+            exit 0
+          fi
+          git add -A
+          git commit -m "Reconcile verifier stack with main"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
