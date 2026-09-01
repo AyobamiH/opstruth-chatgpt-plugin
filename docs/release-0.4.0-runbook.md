@@ -17,11 +17,13 @@ Merge only with the expected PR head SHA. Record the resulting main commit. Neve
 The main-branch workflow deploys the Worker with the main commit identity. Require green post-merge CI and deployment, then independently check:
 
 - `/health`: version 0.4.0, 21 tools, Evidence Graph 1.0.0 and exact commit;
-- `/mcp`: successful initialisation and complete read-only tool list;
+- `/mcp`: protocol-aware POST initialisation and complete read-only tool list; never use a generic GET health probe;
 - `/signing-key`: configured Ed25519 identity;
 - `/privacy`, `/terms` and `/support`: HTTP 200;
 - `/feedback`: controlled reason codes only;
 - live signed snapshot: correct graph schema, digest and signer fingerprint.
+
+The deployed regression must also invoke `opstruth_probe_deployment` from inside the Worker for `/health`, `/privacy`, `/terms`, and `/support`, probe the same routes independently from the workflow runner, and require matching successful status classes. Any internal 522, omitted route, transport ambiguity, or contradiction fails the deployment gate.
 
 ## 5. Rollback criteria
 
