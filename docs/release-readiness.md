@@ -46,10 +46,13 @@ OpsTruth binds public repository, commit, CI, optional runtime and caller-suppli
 
 ## Publication separation
 
-Repository merge, Cloudflare deployment, OpenAI review and visible ChatGPT directory publication are separate states. Do not claim directory publication until version 0.4.0 is visible in the published listing.
+Repository merge, Cloudflare deployment, OpenAI review, visible directory publication, clean-account installation, and a real tool outcome are separate states. Version `0.4.0` is visibly public in the OpenAI Plugins Directory as of 2026-09-01. Its listing still points to the compatibility origin, and clean-account installation and outcome remain unproven.
 
 ## Remaining non-code gates
 
-- Protect `main` with required CI, maintainer-review and human approval rules.
+- Merge and deploy the P0 false-evidence repairs, then pass the internal-versus-independent production regression on the exact deployed commit.
+- Add the verifier-owned least-privilege authenticated GitHub read lane before retrying the fresh DoneState canary.
+- Identify a second trusted human reviewer, then protect `main` with exact PR checks and non-author human approval for protected changes.
+- Create a commit-bound plugin tag and release only after the repaired deployed identity is reconciled.
 - Run the controlled five-mode product-value comparison before making superiority claims.
-- Complete OpenAI review and confirm visible directory version 0.4.0.
+- Reconcile the OpenAI listing metadata from the compatibility origin to the reviewed canonical origin when the provider workflow permits it.

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0.0",
+  "product": "OpsTruth",
+  "observedAt": "2026-09-01T06:40:38Z",
+  "source": {
+    "version": "0.4.0",
+    "commit": "186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5",
+    "ciRun": "33341464435",
+    "deploymentRun": "33341464399",
+    "deploymentLogWorkerVersion": "811fe35d-34a2-444f-a36f-a8421931ade2",
+    "activeProviderVersion": "UNPROVEN"
+  },
+  "channels": {
+    "openaiPlugin": {
+      "state": "PUBLIC",
+      "version": "0.4.0",
+      "listingUrl": "https://chatgpt.com/plugins/plugins_6a8d4dc60bf081918a06094873890eb4",
+      "metadataOrigin": "https://opstruth-chatgpt.woeinvests.workers.dev/",
+      "cleanAccountInstall": "UNPROVEN",
+      "realToolOutcome": "UNPROVEN"
+    },
+    "githubAction": {
+      "state": "PUBLISHED",
+      "version": "1.0.0",
+      "listingUrl": "https://github.com/marketplace/actions/opstruth-evidence",
+      "sourceRepository": "AyobamiH/opstruth",
+      "sourceCommit": "45f4debbd3fbe8217599ab697b8f6c855b372e0b",
+      "separateArtifact": true
+    },
+    "website": {
+      "state": "PUBLIC_VERSION_DRIFT",
+      "url": "https://opstruth.io/",
+      "visibleVersion": "0.2.0"
+    }
+  },
+  "governance": {
+    "mainProtected": false,
+    "rulesetCount": 0,
+    "secondTrustedReviewer": "UNPROVEN",
+    "commitBoundPluginRelease": "ABSENT"
+  },
+  "verification": {
+    "historicalDoneStateRun": "631d8a08-d337-4bae-bd18-b55c31f48a8b",
+    "historicalDecision": "VERIFIED",
+    "freshDoneStateRun": "b4242932-0bc1-4876-a202-634d9c12d72a",
+    "freshDecision": "UNPROVEN",
+    "activeReadLaneIssue": 11
+  },
+  "openP0Issues": [11, 12, 13, 14, 15, 16, 17, 18]
+}
