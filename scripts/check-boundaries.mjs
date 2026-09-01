@@ -62,6 +62,49 @@ const sourceRules = [
 for (const path of await sourceFiles(join(root, "src"))) {
   const source = await readFile(path, "utf8");
   for (const [label, pattern] of sourceRules) if (pattern.test(source)) failures.push(`${path}: ${label}`);
+  if (source.includes("GITHUB_READ_TOKEN")) failures.push(`${path}: legacy static GitHub token support is prohibited`);
+}
+
+const githubSource = await readFile(join(root, "src", "github.js"), "utf8");
+const verificationSource = githubSource.slice(githubSource.indexOf("export async function loadCommitVerificationEvidence"));
+if (!verificationSource.includes("createGithubAppClient")) failures.push("src/github.js: exact-commit verification must use the GitHub App broker");
+if (verificationSource.includes("fetchRawFile") || verificationSource.includes("raw.githubusercontent.com")) {
+  failures.push("src/github.js: exact-commit verification must not use anonymous raw-file reads");
+}
+
+const githubAppSource = await readFile(join(root, "src", "github-app.js"), "utf8");
+if (!githubAppSource.includes('const GITHUB_API_ORIGIN = "https://api.github.com";')) {
+  failures.push("src/github-app.js: GitHub App broker origin must remain pinned to api.github.com");
+}
+if (!githubAppSource.includes("/app/installations/${configuration.installationId}/access_tokens")) {
+  failures.push("src/github-app.js: installation-token broker endpoint is missing");
+}
+if ([...githubAppSource.matchAll(/method:\s*"POST"/g)].length !== 1) {
+  failures.push("src/github-app.js: only the installation-token mint may use POST");
+}
+for (const permission of ["checks", "contents", "statuses"]) {
+  if (!githubAppSource.includes(`${permission}: \"read\"`)) failures.push(`src/github-app.js: ${permission} read permission is missing`);
+}
+
+const wranglerSource = await readFile(join(root, "wrangler.jsonc"), "utf8");
+const wrangler = JSON.parse(wranglerSource);
+if (wrangler.vars?.OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY !== "AyobamiH/donestate") {
+  failures.push("wrangler.jsonc: verification repository must remain pinned to AyobamiH/donestate");
+}
+if (wrangler.vars?.OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY_ID !== "1348643925") {
+  failures.push("wrangler.jsonc: verification repository ID must remain pinned to DoneState repository 1348643925");
+}
+for (const secret of ["OPSTRUTH_GITHUB_APP_ID", "OPSTRUTH_GITHUB_APP_INSTALLATION_ID", "OPSTRUTH_GITHUB_APP_PRIVATE_KEY_PEM"]) {
+  if (Object.hasOwn(wrangler.vars || {}, secret)) failures.push(`wrangler.jsonc: ${secret} must be a Worker secret, not a plaintext var`);
+}
+
+const deployWorkflow = await readFile(join(root, ".github", "workflows", "deploy-cloudflare.yml"), "utf8");
+const firstDeploy = deployWorkflow.indexOf("wrangler@4.127.0 deploy");
+for (const secret of ["OPSTRUTH_GITHUB_APP_ID", "OPSTRUTH_GITHUB_APP_INSTALLATION_ID", "OPSTRUTH_GITHUB_APP_PRIVATE_KEY_PEM"]) {
+  const preflight = deployWorkflow.indexOf(secret);
+  if (preflight === -1 || firstDeploy === -1 || preflight > firstDeploy) failures.push(`deploy-cloudflare.yml: ${secret} must be checked before deployment`);
+  if (deployWorkflow.includes(`secret put ${secret}`)) failures.push(`deploy-cloudflare.yml: ${secret} provisioning requires a separate owner-controlled lane`);
+  if (deployWorkflow.includes(`secrets.${secret}`)) failures.push(`deploy-cloudflare.yml: ${secret} must not transit GitHub Actions secrets`);
 }
 
 const agents = await readFile(join(root, "AGENTS.md"), "utf8");

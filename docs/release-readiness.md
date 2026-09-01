@@ -17,6 +17,8 @@ OpsTruth binds public repository, commit, CI, optional runtime and caller-suppli
 - Real cryptographic vectors verified by the runtime implementation and a standalone verifier.
 - Independent post-execution verification with separate authorizer, executor and verifier identities and role-specific trust allowlists.
 - Fail-closed DoneState v2 handoff validation, exact-commit re-observation and domain-separated Ed25519 attestation signing.
+- Candidate verifier-owned GitHub App lane for installation-authenticated DoneState reads, restricted to one reviewed public repository with short-lived, scope-validated credentials.
+- Candidate complete `donestate.verification-contract.v2` response producer with byte-pinned DoneState report, attestation and deterministic positive/negative vectors.
 - Five additive read-only MCP tools: snapshot, compare, verify execution result, expose the public verifier identity and attest DoneState handoff.
 - Canonical compatibility locks for all sixteen 0.3.1 public tool contracts.
 - Analytics v2 and optional reason-coded feedback with no subject, prompt, URL, receipt, graph, free-text or user identifiers.
@@ -26,6 +28,7 @@ OpsTruth binds public repository, commit, CI, optional runtime and caller-suppli
 
 - No public tool mutates a target repository, CI system, provider, deployment or runtime.
 - No public input accepts tokens, passwords, private keys or other credentials.
+- General public-repository tools remain anonymous; only the selected DoneState exact-commit bridge may use brokered Metadata, Contents, Checks and Commit-statuses read authority.
 - Private repository production access, provider-authenticated deployment verification, managed graph history and Executioner remain deferred.
 - Receipt state never determines the independent verification verdict.
 - Unknown signer trust, invalid signatures, stale evidence, incompatible subjects and proof gaps fail closed.
@@ -39,10 +42,14 @@ OpsTruth binds public repository, commit, CI, optional runtime and caller-suppli
 - Evidence schemas, structural examples and real cryptographic vectors pass.
 - Adversarial tamper, signer, subject, expiry, scope and contradiction tests pass.
 - Wrangler produces a deployable Worker bundle.
-- Pull-request CI and contents-read maintainer review pass on the exact head commit.
+- Pull-request CI and deterministic maintainer review pass on the exact head commit.
+- Non-author human review is recorded for authentication, architecture, contracts, workflows and authority-sensitive changes.
 - Post-merge CI and Cloudflare deployment pass on the exact main commit.
-- `/health` reports version `0.4.0`, 21 tools, Evidence Graph `1.0.0` and the exact deployed commit.
+- Deployment fails before its first write when the three required GitHub App Worker secret names are absent.
+- `/health` reports version `0.4.0`, 21 tools, Evidence Graph `1.0.0`, the exact deployed commit and configured selected-repository GitHub App verification.
 - `/mcp`, `/signing-key`, `/privacy`, `/terms`, `/support` and reason-coded feedback are freshly checked.
+- Internal Worker self-probes and independent runner probes agree for the required deployment routes.
+- A new consequence-disabled sealed DoneState canary verifies through authenticated exact-head reads and the complete versioned response contract; historical PR #22 remains unchanged.
 
 ## Publication separation
 
@@ -50,8 +57,10 @@ Repository merge, Cloudflare deployment, OpenAI review, visible directory public
 
 ## Remaining non-code gates
 
-- Merge and deploy the P0 false-evidence repairs, then pass the internal-versus-independent production regression on the exact deployed commit.
-- Add the verifier-owned least-privilege authenticated GitHub read lane before retrying the fresh DoneState canary.
+- Merge the reconciled P0 carrier to `main`, then deploy the exact main commit and pass the internal-versus-independent production regression.
+- Create and independently review the verifier-owned GitHub App, install it only on `AyobamiH/donestate`, and configure its three Cloudflare Worker secrets before the authenticated canary.
+- Obtain non-author architecture/security review for the authority-sensitive authentication, contract and deployment changes.
+- Run a fresh consequence-disabled DoneState canary only after exact-commit production read-back succeeds.
 - Identify a second trusted human reviewer, then protect `main` with exact PR checks and non-author human approval for protected changes.
 - Create a commit-bound plugin tag and release only after the repaired deployed identity is reconciled.
 - Run the controlled five-mode product-value comparison before making superiority claims.

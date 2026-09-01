@@ -67,6 +67,28 @@ test("worker serves health and policy routes", async () => {
   assert.equal(healthBody.tools, 21);
   assert.equal(healthBody.evidenceGraph, "1.0.0");
   assert.equal(healthBody.commit, "abc123");
+  assert.deepEqual(healthBody.githubVerification, {
+    mode: "github_app_installation",
+    configured: false,
+    scope: "selected_public_repository",
+  });
+  const appKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
+  const configuredHealth = await worker.fetch(new Request("https://example.test/health"), {
+    OPSTRUTH_GITHUB_APP_ID: "123456",
+    OPSTRUTH_GITHUB_APP_INSTALLATION_ID: "987654",
+    OPSTRUTH_GITHUB_APP_PRIVATE_KEY_PEM: appKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY: "Example/project",
+    OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY_ID: "424242",
+  }, {});
+  const configuredBody = await configuredHealth.json();
+  assert.deepEqual(configuredBody.githubVerification, {
+    mode: "github_app_installation",
+    configured: true,
+    scope: "selected_public_repository",
+  });
+  assert.equal(JSON.stringify(configuredBody).includes("123456"), false);
+  assert.equal(JSON.stringify(configuredBody).includes("Example/project"), false);
+  assert.equal(JSON.stringify(configuredBody).includes("424242"), false);
   for (const path of ["/privacy", "/terms", "/support"]) {
     const response = await worker.fetch(new Request(`https://example.test${path}`), {}, {});
     assert.equal(response.status, 200);

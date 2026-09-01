@@ -1,6 +1,6 @@
 # Current status
 
-As of 2026-09-01, OpsTruth `0.4.0` is publicly visible in the OpenAI Plugins Directory and deployed on its owned MCP domain. The deployed source is not production-ready because five false-evidence or deployed-probe defects remain open and the repository has no enforced protected review or commit-bound release identity.
+As of 2026-09-01, OpsTruth `0.4.0` is publicly visible in the OpenAI Plugins Directory and deployed on its owned MCP domain. The currently deployed source remains commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`; the P0 repair stack on PR #20 is not production evidence until it reaches `main`, deploys, and passes fresh read-back.
 
 ## Verified production identity
 
@@ -28,27 +28,23 @@ The Marketplace Action is not a release of this plugin repository. This reposito
 
 ## Active P0 repair program
 
-- #12: semantic snapshot deltas instead of timestamp-driven churn
-- #13: Cloudflare custom-domain self-probe 522 and deployed comparison smoke
-- #14: capability-specific migration coverage that fails closed on omissions
-- #15: exact-head GitHub outcome classification instead of endpoint-availability claims
-- #16: scoped graph verdicts with release readiness explicitly unproven
-- #17: protected human review and commit-bound release identity
-- #18: adversarial, negative, and deployed regression gates
+The open carrier PR #20 now contains the reconciled false-evidence repairs plus the stacked verifier work that was reviewed separately in #23 and #25. Until #20 reaches `main`, those changes remain candidate source rather than deployed truth.
 
-Live reproductions confirmed the migration false-complete result and the internal 522 self-probe on the deployed commit. A green historical suite and smoke are therefore evidence about those runs only, not proof the current production behavior is correct.
+The carrier includes capability-specific migration completeness, exact-head GitHub outcome classification, scoped graph verdicts, the internal-versus-independent deployment smoke regression, a verifier-owned GitHub App read lane restricted to `AyobamiH/donestate`, and the complete `donestate.verification-contract.v2` response envelope with pinned shared vectors.
 
 ## DoneState bridge state
 
-Historical DoneState run `631d8a08-d337-4bae-bd18-b55c31f48a8b` remains valid historical `VERIFIED` evidence. Fresh canary `b4242932-0bc1-4876-a202-634d9c12d72a` remains unproven. The latest retry failed closed on GitHub's anonymous rate limit and did not add an attestation. The active dependency is plugin issue #11 for a verifier-owned least-privilege authenticated GitHub read lane.
+Historical DoneState run `631d8a08-d337-4bae-bd18-b55c31f48a8b` remains valid historical `VERIFIED` evidence. Historical run `b4242932-0bc1-4876-a202-634d9c12d72a` remains unproven and must not be rewritten or retroactively trusted.
 
-DoneState PR #22 was later owner-merged without public terminal verifier evidence. That owner action does not widen OpsTruth authority and does not verify the canary.
+The candidate verifier lane uses short-lived installation credentials, authenticated exact-head Metadata/Contents/Checks/Commit-status reads, strict repository identity and scope checks, and no anonymous or static-token success fallback. The candidate bridge returns the strict `{ contractVersion, report, attestation }` response required by DoneState. Neither capability is recorded as production-ready until the carrier is independently reviewed, merged to `main`, the GitHub App is correctly installed/configured, the exact main commit deploys, and a new consequence-disabled sealed canary reaches terminal read-back.
+
+DoneState PR #22 was owner-merged without public terminal verifier evidence. That owner action does not widen OpsTruth authority and does not verify the historical canary.
 
 ## Maintainer and release gates
 
 Maintainer bot v0 remains a deterministic, contents-read evidence source. It cannot approve, merge, deploy, release, or sign verification for its own change.
 
-`main` is currently unprotected, repository rulesets are absent, CODEOWNERS names only `@AyobamiH`, and no second trusted human reviewer is identified. Security, authentication, deployment, release, and evidence-contract changes require non-author human review before merge. A commit-bound tag and release must wait until the P0 repairs are merged, deployed, independently regressed, and reconciled to exact channel identities.
+`main` is currently unprotected, repository rulesets are not enforced, CODEOWNERS names only `@AyobamiH`, and no second trusted human reviewer is identified. Security, authentication, deployment, release, and evidence-contract changes require non-author human review before merge. A commit-bound tag and release must wait until the repaired deployed identity is reconciled to exact channel identities.
 
 ## Deferred scope
 

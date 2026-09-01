@@ -1,11 +1,15 @@
 import { bounded, unique } from "./utils.js";
 import { PLUGIN_VERSION } from "./version.js";
+import { createGithubAppClient } from "./github-app.js";
 
 const MAX_TREE_ENTRIES = 20000;
 // Keep repository, status and file fetches below Cloudflare's per-invocation subrequest ceiling.
 const MAX_FILES = 30;
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+const MAX_MIGRATION_FILES = 12;
+const MAX_MIGRATION_TOTAL_BYTES = 2 * 1024 * 1024;
+const MAX_COVERAGE_PATHS = 100;
 const MAX_GITHUB_API_BYTES = 16 * 1024 * 1024;
 const MAX_ARCHIVE_COMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_ARCHIVE_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
@@ -55,18 +59,16 @@ async function cachedFetch(request, ctx) {
   return response;
 }
 
-function githubHeaders(env = {}) {
-  const headers = {
+function githubHeaders() {
+  return {
     accept: "application/vnd.github+json",
     "user-agent": `opstruth-chatgpt-plugin/${PLUGIN_VERSION}`,
     "x-github-api-version": "2022-11-28",
   };
-  if (env?.GITHUB_READ_TOKEN) headers.authorization = `Bearer ${env.GITHUB_READ_TOKEN}`;
-  return headers;
 }
 
 async function githubApi(path, ctx, env = {}, options = {}) {
-  const headers = githubHeaders(env);
+  const headers = githubHeaders();
   const request = new Request(`https://api.github.com${path}`, { headers });
   const response = options.fresh ? await fetch(request) : await cachedFetch(request, ctx);
   if (!response.ok) {
@@ -135,6 +137,34 @@ function selectFiles(tree) {
     .filter((entry) => priority(entry.path) > 0)
     .sort((left, right) => priority(right.path) - priority(left.path) || left.path.localeCompare(right.path))
     .slice(0, MAX_FILES);
+}
+
+function isMigrationPath(path) {
+  return /(?:^|\/)migrations?\//i.test(path) || /migration/i.test(path.split("/").at(-1) || "");
+}
+
+function coverageList(paths) {
+  const sorted = [...paths].sort();
+  return { count: sorted.length, paths: sorted.slice(0, MAX_COVERAGE_PATHS), pathsTruncated: sorted.length > MAX_COVERAGE_PATHS };
+}
+
+function migrationCoverage(tree, files, omissions, treeTruncated, limitations = []) {
+  const discoveredPaths = tree.filter((entry) => entry.type === "blob" && isMigrationPath(entry.path)).map((entry) => entry.path);
+  const inspectedPaths = files.map((file) => file.path);
+  const sortedOmissions = [...omissions].sort((left, right) => left.path.localeCompare(right.path) || left.reason.localeCompare(right.reason));
+  return {
+    complete: !treeTruncated && sortedOmissions.length === 0 && inspectedPaths.length === discoveredPaths.length,
+    treeComplete: !treeTruncated,
+    limits: { maxFiles: MAX_MIGRATION_FILES, maxFileBytes: MAX_FILE_BYTES, maxTotalBytes: MAX_MIGRATION_TOTAL_BYTES },
+    discovered: coverageList(discoveredPaths),
+    inspected: coverageList(inspectedPaths),
+    omitted: {
+      count: sortedOmissions.length,
+      items: sortedOmissions.slice(0, MAX_COVERAGE_PATHS),
+      itemsTruncated: sortedOmissions.length > MAX_COVERAGE_PATHS,
+    },
+    limitations: [...new Set([...(treeTruncated ? ["tree_truncated"] : []), ...limitations])].sort(),
+  };
 }
 
 function tarString(bytes, start, length) {
@@ -301,6 +331,30 @@ async function loadArchiveSnapshot(repository, ctx) {
   if (!parsed.tree.length) throw new Error("GitHub archive did not contain a readable public repository tree");
   const lowerPaths = new Set(parsed.tree.map((entry) => entry.path.toLowerCase()));
 
+  const availableMigrationFiles = parsed.files.filter((file) => isMigrationPath(file.path)).sort((left, right) => left.path.localeCompare(right.path));
+  const migrationFiles = [];
+  const migrationOmissionReasons = new Map();
+  let migrationBytes = 0;
+  for (const file of availableMigrationFiles) {
+    if (migrationFiles.length >= MAX_MIGRATION_FILES) migrationOmissionReasons.set(file.path, "file_count_limit");
+    else {
+      const bytes = new TextEncoder().encode(file.text).byteLength;
+      if (migrationBytes + bytes > MAX_MIGRATION_TOTAL_BYTES) migrationOmissionReasons.set(file.path, "total_byte_limit");
+      else {
+        migrationFiles.push(file);
+        migrationBytes += bytes;
+      }
+    }
+  }
+  const migrationFilePaths = new Set(migrationFiles.map((file) => file.path));
+  const migrationOmissions = parsed.tree
+    .filter((entry) => entry.type === "blob" && isMigrationPath(entry.path) && !migrationFilePaths.has(entry.path))
+    .map((entry) => ({
+      path: entry.path,
+      reason: migrationOmissionReasons.get(entry.path)
+        || (Number(entry.size || 0) > MAX_FILE_BYTES ? "file_byte_limit" : "archive_fallback_not_selected"),
+    }));
+
   return {
     repository: {
       owner: repository.owner,
@@ -321,6 +375,10 @@ async function loadArchiveSnapshot(repository, ctx) {
     },
     tree: parsed.tree,
     files: parsed.files,
+    capabilityFiles: { migrations: migrationFiles },
+    capabilityCoverage: {
+      migrations: migrationCoverage(parsed.tree, migrationFiles, migrationOmissions, parsed.treeTruncated, ["archive_fallback_bounded_selection"]),
+    },
     limits: {
       treeEntriesObserved: parsed.tree.length,
       treeTruncated: parsed.treeTruncated,
@@ -356,6 +414,47 @@ async function fetchSelectedFiles(repository, branch, tree) {
     }
   }
   return files;
+}
+
+async function fetchMigrationCapability(repository, branch, tree, treeTruncated) {
+  const discovered = tree.filter((entry) => entry.type === "blob" && isMigrationPath(entry.path))
+    .sort((left, right) => left.path.localeCompare(right.path));
+  const omissions = [];
+  const eligible = [];
+  for (const entry of discovered) {
+    if (unsafeToRead(entry.path)) omissions.push({ path: entry.path, reason: "unsafe_path" });
+    else if (Number(entry.size || 0) > MAX_FILE_BYTES) omissions.push({ path: entry.path, reason: "file_byte_limit" });
+    else eligible.push(entry);
+  }
+  const selected = eligible.slice(0, MAX_MIGRATION_FILES);
+  for (const entry of eligible.slice(MAX_MIGRATION_FILES)) omissions.push({ path: entry.path, reason: "file_count_limit" });
+
+  const files = [];
+  let totalBytes = 0;
+  for (let index = 0; index < selected.length; index += 6) {
+    const batchEntries = selected.slice(index, index + 6);
+    const batch = await Promise.all(batchEntries.map(async (entry) => {
+      try {
+        return { entry, file: await fetchRawFile(repository, branch, entry), reason: null };
+      } catch {
+        return { entry, file: null, reason: "read_error" };
+      }
+    }));
+    for (const item of batch) {
+      if (!item.file) {
+        omissions.push({ path: item.entry.path, reason: item.reason || "unreadable" });
+        continue;
+      }
+      const bytes = new TextEncoder().encode(item.file.text).byteLength;
+      if (totalBytes + bytes > MAX_MIGRATION_TOTAL_BYTES) {
+        omissions.push({ path: item.entry.path, reason: "total_byte_limit" });
+        continue;
+      }
+      files.push(item.file);
+      totalBytes += bytes;
+    }
+  }
+  return { files, coverage: migrationCoverage(tree, files, omissions, treeTruncated) };
 }
 
 function unavailableGithubStatus(defaultBranch, reason) {
@@ -471,9 +570,11 @@ export async function loadRepositorySnapshot(input, env = {}, ctx = {}) {
   const branch = metadata.default_branch;
   const completeTree = Array.isArray(treePayload.tree) ? treePayload.tree : [];
   const tree = bounded(completeTree, MAX_TREE_ENTRIES).map(({ path, type, size, sha }) => ({ path, type, size: size || 0, sha }));
-  const [files, githubStatus] = await Promise.all([
+  const treeTruncated = Boolean(treePayload.truncated) || completeTree.length > MAX_TREE_ENTRIES;
+  const [files, githubStatus, migrationCapability] = await Promise.all([
     fetchSelectedFiles(repository, branch, tree),
     loadGithubStatus(repository, branch, ctx, env),
+    fetchMigrationCapability(repository, branch, tree, treeTruncated),
   ]);
   return {
     repository: {
@@ -494,10 +595,12 @@ export async function loadRepositorySnapshot(input, env = {}, ctx = {}) {
     },
     tree,
     files,
+    capabilityFiles: { migrations: migrationCapability.files },
+    capabilityCoverage: { migrations: migrationCapability.coverage },
     githubStatus,
     limits: {
       treeEntriesObserved: tree.length,
-      treeTruncated: Boolean(treePayload.truncated) || completeTree.length > MAX_TREE_ENTRIES,
+      treeTruncated,
       filesRead: files.length,
       maxFiles: MAX_FILES,
       maxFileBytes: MAX_FILE_BYTES,
@@ -544,41 +647,97 @@ function assertVerificationPath(value) {
   return path;
 }
 
+function githubAppObservationReason(error) {
+  if (error?.code === "GITHUB_APP_RATE_LIMIT") return "rate_limited";
+  if (["GITHUB_APP_AUTH_FAILED", "GITHUB_APP_NOT_CONFIGURED", "GITHUB_APP_CONFIGURATION_INVALID", "GITHUB_APP_TOKEN_INVALID"].includes(error?.code)) {
+    return "authentication_unavailable";
+  }
+  if (error?.code === "GITHUB_APP_PERMISSION_DENIED" || error?.code === "GITHUB_APP_SCOPE_INVALID") return "permission_denied";
+  if (error?.code === "GITHUB_APP_NOT_FOUND") return "not_found";
+  if (error?.code === "GITHUB_APP_RESPONSE_INVALID") return "provider_response_invalid";
+  return "github_verification_unavailable";
+}
+
+async function optionalGithubAppApi(client, path, options = {}) {
+  try {
+    return { available: true, value: await client.json(path, options), reason: null };
+  } catch (error) {
+    return { available: false, value: null, reason: githubAppObservationReason(error) };
+  }
+}
+
+function decodeContentsFile(payload, entry) {
+  if (payload === null) return null;
+  if (!payload || Array.isArray(payload) || payload.type !== "file" || payload.path !== entry.path
+    || payload.sha !== entry.sha || payload.encoding !== "base64" || Number(payload.size) > MAX_FILE_BYTES) {
+    const error = new Error("GitHub verification file response was invalid");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  const encoded = typeof payload.content === "string" ? payload.content.replace(/\s+/g, "") : "";
+  if (typeof payload.content !== "string" || encoded.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) {
+    const error = new Error("GitHub verification file response was invalid");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  let binary;
+  try {
+    binary = atob(encoded);
+  } catch {
+    const error = new Error("GitHub verification file response was invalid");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  if (binary.length > MAX_FILE_BYTES || Number(payload.size) !== binary.length) {
+    const error = new Error("GitHub verification file response exceeded its bound");
+    error.code = "GITHUB_APP_RESPONSE_INVALID";
+    throw error;
+  }
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return { path: entry.path, text: decoder.decode(bytes), truncated: false };
+}
+
+async function fetchVerificationFile(client, repository, headSha, entry) {
+  const encodedPath = entry.path.split("/").map(encodeURIComponent).join("/");
+  const payload = await client.json(
+    `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}/contents/${encodedPath}?ref=${encodeURIComponent(headSha)}`,
+    { allowNotFound: true },
+  );
+  return decodeContentsFile(payload, entry);
+}
+
 export async function loadCommitVerificationEvidence({ repository: input, baseSha, headSha, paths: requestedPaths = [] }, env = {}, ctx = {}) {
   const repository = parseRepository(input);
   assertCommitSha(baseSha, "base_sha");
   assertCommitSha(headSha, "head_sha");
   const paths = [...new Set(requestedPaths.map(assertVerificationPath))].sort();
   if (paths.length > 20) throw new Error("verification_path_limit_exceeded");
-  const metadata = await githubApi(`/repos/${repository.owner}/${repository.repo}`, ctx, env);
-  if (metadata.private) throw new Error("Private repositories require a future authenticated lane");
+  const client = createGithubAppClient(env, repository.fullName);
+  const repositoryPrefix = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`;
+  const metadata = await client.json(repositoryPrefix);
+  client.assertSelectedRepository(metadata);
   const encodedHead = encodeURIComponent(headSha);
   const encodedBase = encodeURIComponent(baseSha);
-  const [commitResult, treeResult, compareResult, checksResult, statusResult] = await Promise.all([
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/git/trees/${encodedHead}?recursive=1`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/compare/${encodedBase}...${encodedHead}`, ctx, env),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/check-runs?per_page=100`, ctx, env, { fresh: true }),
-    optionalGithubApi(`/repos/${repository.owner}/${repository.repo}/commits/${encodedHead}/status`, ctx, env, { fresh: true }),
-  ]);
+  const commitResult = await optionalGithubAppApi(client, `${repositoryPrefix}/commits/${encodedHead}`);
+  const treeResult = await optionalGithubAppApi(client, `${repositoryPrefix}/git/trees/${encodedHead}?recursive=1`);
+  const compareResult = await optionalGithubAppApi(client, `${repositoryPrefix}/compare/${encodedBase}...${encodedHead}`);
+  const checksResult = await optionalGithubAppApi(client, `${repositoryPrefix}/commits/${encodedHead}/check-runs?per_page=100`);
+  const statusResult = await optionalGithubAppApi(client, `${repositoryPrefix}/commits/${encodedHead}/status`);
   const tree = Array.isArray(treeResult.value?.tree)
     ? bounded(treeResult.value.tree, MAX_TREE_ENTRIES).map(({ path, type, size, sha }) => ({ path, type, size: size || 0, sha }))
     : [];
   const byPath = new Map(tree.map((entry) => [entry.path, entry]));
   const files = [];
   let totalBytes = 0;
-  for (let index = 0; index < paths.length; index += 10) {
-    const batch = await Promise.all(paths.slice(index, index + 10).map(async (path) => {
-      const entry = byPath.get(path);
-      if (!entry || entry.type !== "blob" || Number(entry.size || 0) > MAX_FILE_BYTES || unsafeToRead(path)) return null;
-      return fetchRawFile(repository, headSha, entry);
-    }));
-    for (const file of batch.filter(Boolean)) {
-      const bytes = new TextEncoder().encode(file.text).byteLength;
-      if (totalBytes + bytes > MAX_TOTAL_BYTES) break;
-      files.push(file);
-      totalBytes += bytes;
-    }
+  for (const path of paths) {
+    const entry = byPath.get(path);
+    if (!entry || entry.type !== "blob" || Number(entry.size || 0) > MAX_FILE_BYTES || unsafeToRead(path)) continue;
+    const file = await fetchVerificationFile(client, repository, headSha, entry);
+    if (!file) continue;
+    const bytes = new TextEncoder().encode(file.text).byteLength;
+    if (totalBytes + bytes > MAX_TOTAL_BYTES) break;
+    files.push(file);
+    totalBytes += bytes;
   }
   const changedFiles = Array.isArray(compareResult.value?.files)
     ? compareResult.value.files.slice(0, 300).map((file) => ({
@@ -611,6 +770,7 @@ export async function loadCommitVerificationEvidence({ repository: input, baseSh
       providerRepositoryId: metadata.id === undefined || metadata.id === null ? null : String(metadata.id),
       htmlUrl: metadata.html_url,
       visibility: metadata.visibility,
+      evidenceAuthority: client.authority,
     },
     subject: {
       baseSha: baseSha.toLowerCase(),

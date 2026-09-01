@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { generateKeyPairSync } from "node:crypto";
 import { canonicalJson } from "../src/canonical.js";
 import { verifyDoneStateHandoff } from "../src/donestate.js";
 import { callTool } from "../src/tools.js";
@@ -11,6 +12,18 @@ const BASE = "1".repeat(40);
 const HEAD = "2".repeat(40);
 const GENERATED_AT = "2026-08-28T12:00:00.000Z";
 const OBSERVED_AT = "2026-08-28T12:01:00.000Z";
+const githubAppPrivateKey = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey;
+
+function verificationEnv() {
+  return {
+    ...testSigningEnv(),
+    OPSTRUTH_GITHUB_APP_ID: "123456",
+    OPSTRUTH_GITHUB_APP_INSTALLATION_ID: "987654",
+    OPSTRUTH_GITHUB_APP_PRIVATE_KEY_PEM: githubAppPrivateKey.export({ type: "pkcs8", format: "pem" }).toString(),
+    OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY: "Example/project",
+    OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY_ID: "424242",
+  };
+}
 
 async function handoff(overrides = {}) {
   const payload = {
@@ -62,6 +75,23 @@ function installFetchMock(
   let checkRequest = 0;
   globalThis.fetch = async (request) => {
     const url = new URL(typeof request === "string" ? request : request.url);
+    if (url.hostname === "api.github.com" && url.pathname === "/app/installations/987654/access_tokens") {
+      assert.equal(request.method, "POST");
+      assert.deepEqual(await request.json(), {
+        repositories: ["project"],
+        permissions: { checks: "read", contents: "read", statuses: "read" },
+      });
+      return Response.json({
+        token: "fixture-installation-token",
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        permissions: { checks: "read", contents: "read", metadata: "read", statuses: "read" },
+        repository_selection: "selected",
+        repositories: [{ id: 424242, full_name: "Example/project", private: false, visibility: "public" }],
+      });
+    }
+    if (url.hostname === "api.github.com") {
+      assert.equal(request.headers.get("authorization"), "Bearer fixture-installation-token");
+    }
     if (url.hostname === "api.github.com" && url.pathname === "/repos/Example/project") {
       return Response.json({ id: 424242, full_name: "Example/project", html_url: "https://github.com/Example/project", visibility: "public", private: false });
     }
@@ -88,8 +118,16 @@ function installFetchMock(
     if (url.hostname === "api.github.com" && url.pathname === `/repos/Example/project/commits/${HEAD}/status`) {
       return Response.json({ state: "success", statuses: [] });
     }
-    if (url.hostname === "raw.githubusercontent.com" && url.pathname.endsWith(`/${HEAD}/README.md`)) return new Response(readme);
-    if (url.hostname === "raw.githubusercontent.com" && url.pathname.endsWith(`/${HEAD}/package.json`)) return new Response('{"name":"fixture"}');
+    if (url.hostname === "api.github.com" && url.pathname === "/repos/Example/project/contents/README.md") {
+      assert.equal(url.searchParams.get("ref"), HEAD);
+      return Response.json({ type: "file", path: "README.md", sha: "readme", size: Buffer.byteLength(readme), encoding: "base64", content: Buffer.from(readme).toString("base64") });
+    }
+    if (url.hostname === "api.github.com" && url.pathname === "/repos/Example/project/contents/package.json") {
+      const body = '{"name":"fixture"}';
+      assert.equal(url.searchParams.get("ref"), HEAD);
+      return Response.json({ type: "file", path: "package.json", sha: "package", size: Buffer.byteLength(body), encoding: "base64", content: Buffer.from(body).toString("base64") });
+    }
+    if (url.hostname === "raw.githubusercontent.com") assert.fail("verification evidence must not use anonymous raw GitHub reads");
     return new Response("unexpected", { status: 500 });
   };
   return () => { globalThis.fetch = original; };
@@ -135,7 +173,9 @@ async function signatureValid(attestation) {
 test("OpsTruth independently verifies and signs an exact DoneState v2 handoff", async () => {
   const restore = installFetchMock();
   try {
-    const verification = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    const verification = await verifyDoneStateHandoff(await handoff(), verificationEnv(), {}, { observedAt: OBSERVED_AT });
+    assert.deepEqual(Object.keys(verification).sort(), ["attestation", "contractVersion", "report"]);
+    assert.equal(verification.contractVersion, "donestate.verification-contract.v2");
     assert.equal(verification.report.decision, "verified");
     assert.ok(verification.report.requirementResults.every((item) => item.verdict === "VERIFIED"));
     assert.equal(verification.attestation.decision, "verified");
@@ -152,11 +192,11 @@ test("OpsTruth refreshes exact-head GitHub checks between pending and successful
   ]);
   const restoreCache = installCacheMock();
   try {
-    const pending = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    const pending = await verifyDoneStateHandoff(await handoff(), verificationEnv(), {}, { observedAt: OBSERVED_AT });
     assert.equal(pending.report.decision, "uncertain");
     assert.equal(pending.report.requirementResults[2].reasonCode, "github_checks_pending");
 
-    const successful = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    const successful = await verifyDoneStateHandoff(await handoff(), verificationEnv(), {}, { observedAt: OBSERVED_AT });
     assert.equal(successful.report.decision, "verified");
     assert.equal(successful.report.requirementResults[2].reasonCode, "github_checks_satisfied");
   } finally {
@@ -168,7 +208,7 @@ test("OpsTruth refreshes exact-head GitHub checks between pending and successful
 test("OpsTruth treats a terminal non-success GitHub check as failed", async () => {
   const restore = installFetchMock(undefined, [{ status: "completed", conclusion: "neutral" }]);
   try {
-    const verification = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    const verification = await verifyDoneStateHandoff(await handoff(), verificationEnv(), {}, { observedAt: OBSERVED_AT });
     assert.equal(verification.report.decision, "failed");
     assert.equal(verification.report.requirementResults[2].reasonCode, "github_checks_terminal_failure");
   } finally {
@@ -186,7 +226,7 @@ test("OpsTruth exposes a DoneState-compatible public verifier fingerprint", asyn
 test("OpsTruth signs a failed decision when fresh evidence contradicts sealed content", async () => {
   const restore = installFetchMock("# Unrelated product");
   try {
-    const verification = await verifyDoneStateHandoff(await handoff(), testSigningEnv(), {}, { observedAt: OBSERVED_AT });
+    const verification = await verifyDoneStateHandoff(await handoff(), verificationEnv(), {}, { observedAt: OBSERVED_AT });
     assert.equal(verification.report.decision, "failed");
     assert.equal(verification.attestation.decision, "failed");
     assert.equal(await signatureValid(verification.attestation), true);
@@ -207,7 +247,8 @@ test("OpsTruth rejects handoff drift before reading or signing", async () => {
 test("MCP exposes the DoneState bridge without submitting the attestation", async () => {
   const restore = installFetchMock();
   try {
-    const response = await callTool("opstruth_attest_donestate_handoff", { handoff: await handoff() }, testSigningEnv(), {});
+    const response = await callTool("opstruth_attest_donestate_handoff", { handoff: await handoff() }, verificationEnv(), {});
+    assert.equal(response.structuredContent.contractVersion, "donestate.verification-contract.v2");
     assert.equal(response.structuredContent.report.decision, "verified");
     assert.match(response.content[0].text, /attestation was not submitted/);
   } finally {

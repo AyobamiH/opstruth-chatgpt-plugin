@@ -55,6 +55,57 @@ function evidencePath(summary, evidence) {
   return { summary, evidence: Array.isArray(evidence) ? evidence : [evidence] };
 }
 
+function signalAssessment(verdict, reason, observations = []) {
+  return { verdict, reason, observations };
+}
+
+function assessWorkflowRuns(githubStatus) {
+  if (!githubStatus?.workflowRuns?.available) return signalAssessment("UNPROVEN", githubStatus?.workflowRuns?.reason || "workflow_api_unavailable");
+  const head = githubStatus.headCommitSha;
+  if (!head) return signalAssessment("UNPROVEN", "head_commit_unavailable");
+  const exactHead = (githubStatus.workflowRuns.latest || []).filter((run) => run.headSha === head);
+  if (!exactHead.length) return signalAssessment("UNPROVEN", "no_exact_head_workflow_runs");
+  const terminalNonSuccess = exactHead.filter((run) => run.status === "completed" && run.conclusion !== "success");
+  if (terminalNonSuccess.length) return signalAssessment("RISKY", "exact_head_workflow_not_successful", terminalNonSuccess);
+  const incomplete = exactHead.filter((run) => run.status !== "completed" || !run.conclusion);
+  if (incomplete.length) return signalAssessment("UNPROVEN", "exact_head_workflow_incomplete", incomplete);
+  return signalAssessment("VERIFIED", "all_observed_exact_head_workflows_succeeded", exactHead);
+}
+
+function assessCheckRuns(githubStatus) {
+  if (!githubStatus?.checkRuns?.available) return signalAssessment("UNPROVEN", githubStatus?.checkRuns?.reason || "check_runs_api_unavailable");
+  const checks = githubStatus.checkRuns.latest || [];
+  if (!githubStatus.headCommitSha) return signalAssessment("UNPROVEN", "head_commit_unavailable");
+  if (!checks.length) return signalAssessment("UNPROVEN", "no_exact_head_check_runs");
+  const terminalNonSuccess = checks.filter((run) => run.status === "completed" && run.conclusion !== "success");
+  if (terminalNonSuccess.length) return signalAssessment("RISKY", "exact_head_check_run_not_successful", terminalNonSuccess);
+  const incomplete = checks.filter((run) => run.status !== "completed" || !run.conclusion);
+  if (incomplete.length) return signalAssessment("UNPROVEN", "exact_head_check_run_incomplete", incomplete);
+  return signalAssessment("VERIFIED", "all_observed_exact_head_checks_succeeded", checks);
+}
+
+function assessCommitStatus(githubStatus) {
+  if (!githubStatus?.commitStatus?.available) return signalAssessment("UNPROVEN", githubStatus?.commitStatus?.reason || "commit_status_api_unavailable");
+  if (!githubStatus.headCommitSha) return signalAssessment("UNPROVEN", "head_commit_unavailable");
+  const contexts = githubStatus.commitStatus.contexts || [];
+  if (!contexts.length) return signalAssessment("UNPROVEN", "combined_status_has_no_contexts");
+  const risky = contexts.filter((status) => ["failure", "error"].includes(status.state));
+  if (["failure", "error"].includes(githubStatus.commitStatus.state) || risky.length) {
+    return signalAssessment("RISKY", "exact_head_commit_status_failed", risky.length ? risky : contexts);
+  }
+  const incomplete = contexts.filter((status) => status.state !== "success");
+  if (githubStatus.commitStatus.state !== "success" || incomplete.length) {
+    return signalAssessment("UNPROVEN", "exact_head_commit_status_incomplete", incomplete.length ? incomplete : contexts);
+  }
+  return signalAssessment("VERIFIED", "all_exact_head_commit_status_contexts_succeeded", contexts);
+}
+
+function applySignalAssessment(result, label, assessment) {
+  if (assessment.verdict === "VERIFIED") result.verified.push(label);
+  else if (assessment.verdict === "RISKY") result.failures.push(`${label}: ${assessment.reason}.`);
+  else result.notVerified.push(`${label}: ${assessment.reason}.`);
+}
+
 export function inspectRepository(snapshot) {
   const result = report(snapshot, "repo-map");
   const allPaths = paths(snapshot);
@@ -212,7 +263,22 @@ export function reviewApiContracts(snapshot) {
 
 export function reviewMigrations(snapshot) {
   const result = report(snapshot, "migration-review");
-  const migrationFiles = fileContents(snapshot).filter((file) => /(?:^|\/)migrations?\//i.test(file.path) || /migration/i.test(file.path));
+  const migrationPattern = /(?:^|\/)migrations?\//i;
+  const migrationNamePattern = /migration/i;
+  const migrationFiles = (snapshot.capabilityFiles?.migrations || fileContents(snapshot).filter((file) => migrationPattern.test(file.path) || migrationNamePattern.test(file.path.split("/").at(-1) || "")))
+    .map((file) => ({ path: file.path, text: file.text }));
+  const discoveredPaths = paths(snapshot).filter((path) => migrationPattern.test(path) || migrationNamePattern.test(path.split("/").at(-1) || "")).sort();
+  const fallbackOmitted = discoveredPaths.filter((path) => !migrationFiles.some((file) => file.path === path))
+    .map((path) => ({ path, reason: "not_in_capability_read_set" }));
+  const coverage = snapshot.capabilityCoverage?.migrations || {
+    complete: !snapshot.limits.treeTruncated && fallbackOmitted.length === 0,
+    treeComplete: !snapshot.limits.treeTruncated,
+    limits: { maxFiles: snapshot.limits.maxFiles, maxFileBytes: snapshot.limits.maxFileBytes, maxTotalBytes: snapshot.limits.maxTotalBytes },
+    discovered: { count: discoveredPaths.length, paths: discoveredPaths, pathsTruncated: false },
+    inspected: { count: migrationFiles.length, paths: migrationFiles.map((file) => file.path).sort(), pathsTruncated: false },
+    omitted: { count: fallbackOmitted.length, items: fallbackOmitted, itemsTruncated: false },
+    limitations: snapshot.limits.treeTruncated ? ["tree_truncated"] : [],
+  };
   const riskPatterns = [
     ["drop-operation", /\bDROP\s+(?:TABLE|COLUMN|DATABASE|SCHEMA)\b/i],
     ["row-security-disabled", /\bDISABLE\s+ROW\s+LEVEL\s+SECURITY\b/i],
@@ -226,8 +292,20 @@ export function reviewMigrations(snapshot) {
   result.migrations = {
     files: migrationFiles.map((file) => file.path),
     riskIndicators: indicators,
+    coverage,
   };
-  result.verified.push("Visible migration paths and selected static risk indicators");
+  if (coverage.complete) {
+    result.verified.push("Capability-specific migration coverage and selected static risk indicators");
+  } else {
+    result.status = "partial";
+    result.confidence = {
+      level: "low",
+      reason: "One or more migration paths were omitted, unreadable, or outside the complete observed tree.",
+    };
+    result.warnings.push(`Migration review coverage is incomplete: ${coverage.inspected.count} of ${coverage.discovered.count} discovered path(s) inspected; ${coverage.omitted.count} omitted.`);
+    if (coverage.limitations?.length) result.warnings.push(`Migration coverage limitations: ${coverage.limitations.join(", ")}.`);
+    result.notVerified.push("Complete migration contents and risk scan");
+  }
   if (indicators.length) result.warnings.push("Migration risk indicators require ordering, backup and compatibility review.");
   result.notVerified.push("Applied migration state", "Database backup", "Rollback viability", "Production data compatibility");
   result.evidence.push(evidencePath("Migration files", result.migrations.files));
@@ -260,6 +338,11 @@ export function checkGithubHandoff(snapshot) {
     },
     packageScriptNames: packageScripts(snapshot),
     publicGithubStatus: githubStatus,
+    signalAssessments: {
+      workflowRuns: assessWorkflowRuns(githubStatus),
+      checkRuns: assessCheckRuns(githubStatus),
+      commitStatus: assessCommitStatus(githubStatus),
+    },
   };
   result.githubHandoff = signals;
   result.verified.push("Visible GitHub workflow and handoff files", "Package script names");
@@ -268,19 +351,12 @@ export function checkGithubHandoff(snapshot) {
   if (licenceStatus === "tree_only") result.warnings.push("A licence file is visible, but GitHub did not report a recognised SPDX licence.");
   if (licenceStatus === "metadata_only") result.warnings.push("GitHub reports a licence, but no licence file was visible in the bounded tree.");
 
-  if (githubStatus?.workflowRuns?.available) {
-    result.verified.push("Latest public GitHub Actions workflow evidence");
-    const latest = githubStatus.workflowRuns.latest || [];
-    const nonPassing = latest.filter((run) => run.status !== "completed" || (run.conclusion && !["success", "neutral", "skipped"].includes(run.conclusion)));
-    if (!latest.length) result.warnings.push("GitHub reported no public workflow runs for the default branch.");
-    if (nonPassing.length) result.warnings.push(`${nonPassing.length} recent public workflow run(s) are incomplete or not passing.`);
-  } else result.notVerified.push("Latest public workflow result");
-
-  if (githubStatus?.checkRuns?.available) result.verified.push("Current default-branch check-run evidence");
-  else result.notVerified.push("Current default-branch check runs");
-
-  if (githubStatus?.commitStatus?.available) result.verified.push("Current default-branch combined commit status");
-  else result.notVerified.push("Current default-branch combined commit status");
+  applySignalAssessment(result, "Exact-head public GitHub Actions success", signals.signalAssessments.workflowRuns);
+  applySignalAssessment(result, "Exact-head check-run success", signals.signalAssessments.checkRuns);
+  applySignalAssessment(result, "Exact-head combined commit-status success", signals.signalAssessments.commitStatus);
+  for (const [name, assessment] of Object.entries(signals.signalAssessments)) {
+    if (assessment.verdict !== "VERIFIED") result.warnings.push(`${name}: ${assessment.verdict.toLowerCase()} (${assessment.reason}).`);
+  }
 
   if (githubStatus?.branchProtection?.available) {
     result.verified.push("Default-branch protection flag");
@@ -351,6 +427,7 @@ export function fullAudit(snapshot) {
   };
   result.evidence = unique(Object.values(sections).flatMap((section) => section.evidence).map((entry) => JSON.stringify(entry)))
     .map((entry) => JSON.parse(entry));
+  if (Object.values(sections).some((section) => section.status !== "complete")) result.status = "partial";
   result.verdict = result.failures.length
     ? { code: "not_ready", label: "Not ready", summary: "Blocking evidence failures remain." }
     : result.warnings.length

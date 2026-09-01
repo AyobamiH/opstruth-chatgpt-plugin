@@ -85,6 +85,12 @@ Private visibility is not write authority. A future private-repository integrati
 
 For GitHub, the intended baseline is metadata read, contents read, actions read, and pull requests read. Contents write, workflows write, pull requests write, deployments write, secrets, and administration permissions are prohibited for the evidence plane.
 
+## Selected public verification identity
+
+The DoneState exact-commit bridge MAY use a verifier-owned GitHub App installed only on the reviewed public DoneState repository. This narrow availability lane is distinct from future private-repository brokerage and MUST NOT authenticate general public audit tools. Its endpoint-derived permissions are Metadata read, Contents read, Checks read, and Commit statuses read. Actions, Pull requests, Deployments, Webhooks, Administration, Secrets, Workflows, and every write permission are outside this lane.
+
+The selected repository MUST be maintenance-reviewed configuration, not a public tool argument. Installation tokens MUST be narrowed to that repository, short-lived, scope-validated, kept out of shared caches and refreshed at most once after revocation evidence. Failure MUST remain blocked or unproven; the bridge MUST NOT fall back to a static token or anonymous verification reads. Credential values and provider response bodies MUST NOT appear in model context, health output, reports, receipts, logs, analytics, cache keys, or errors.
+
 ## Runtime observation
 
 Read-only HTTP methods are intentions, not mathematical guarantees. A misconfigured endpoint can attach side effects to any request. Runtime probing therefore MUST:
@@ -109,6 +115,10 @@ Every material claim SHOULD identify:
 A receipt is a signed claim. Signature verification proves integrity and signer possession of a key. It does not prove authorization, signer trust, safe execution, outcome correctness, or current state.
 
 OpsTruth MUST independently re-observe the requested assertions before returning `VERIFIED` after an execution. When re-observation is incomplete, the result MUST be `PARTIAL`, `CONTRADICTED`, or `UNPROVEN`.
+
+Capability-specific evidence reviews MUST report bounded coverage. For migration inspection this includes discovered, inspected, and omitted paths, deterministic file and byte limits, and an omission reason. A truncated tree, unreadable path, or exhausted capability budget cannot produce complete, high-confidence, or verified migration wording.
+
+Provider API availability is an observation, not a success verdict. GitHub workflow, check-run, and combined-status evidence is verified only when it is nonempty, successful, and bound to the exact observed head. Pending, missing, neutral, skipped, cancelled, stale-head, failing, and context-free signals remain unproven or risky.
 
 ## Portable state and privacy
 

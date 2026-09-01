@@ -4,6 +4,7 @@ import { asErrorMessage, htmlResponse, jsonResponse, signingMetadata } from "./u
 import { landingPage, privacyPage, supportPage, termsPage } from "./pages.js";
 import { recordFeedbackEvent, recordToolEvent, summarizeToolResult } from "./analytics.js";
 import { PLUGIN_VERSION } from "./version.js";
+import { githubAppHealth } from "./github-app.js";
 
 const SERVER = { name: "opstruth", version: PLUGIN_VERSION };
 const INSTRUCTIONS = "Use OpsTruth for evidence-first public GitHub and user-supplied HTTPS health checks. Inspect before broad audits and prefer the narrowest matching tool. Use signed Evidence Graph snapshots when repository, commit, CI and optional runtime observations must be bound to one subject; compare only compatible caller-held snapshots. Verify execution outcomes only from a complete request, authorisation and receipt chain with separate authoritative authorizer and executor fingerprint allowlists, and never infer success from the receipt state. For DoneState, attest only a sealed v2 handoff and return the signed result for separate submission; OpsTruth never calls DoneState or changes its run. Never ask for credentials, infer build success from static files or mutate the target. Use the render tool only after a data tool returns a final report.";
@@ -125,6 +126,7 @@ async function fetchHandler(request, env, ctx) {
       mode: "read-only-public-evidence",
       evidenceSigning: signing.status,
       analytics: env?.OPSTRUTH_ANALYTICS ? "configured" : "not_configured",
+      githubVerification: githubAppHealth(env),
     });
   }
   if (url.pathname === "/signing-key") {

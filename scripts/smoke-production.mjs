@@ -37,6 +37,13 @@ for (const path of [...publicProbePaths, "/signing-key"]) {
     if (body.tools !== expectedTools) errors.push(`/health: expected ${expectedTools} tools, got ${body.tools}`);
     if (body.evidenceGraph !== "1.0.0") errors.push(`/health: expected Evidence Graph 1.0.0, got ${body.evidenceGraph || "missing"}`);
     if (body.evidenceSigning !== "configured") errors.push(`/health: evidence signing is ${body.evidenceSigning || "missing"}`);
+    const githubVerification = body.githubVerification;
+    if (githubVerification?.mode !== "github_app_installation"
+      || githubVerification?.configured !== true
+      || githubVerification?.scope !== "selected_public_repository"
+      || Object.keys(githubVerification || {}).sort().join(",") !== "configured,mode,scope") {
+      errors.push("/health: least-privilege GitHub App verification access is not configured");
+    }
   }
   if (path === "/signing-key") {
     const body = await response.json().catch(() => ({}));
@@ -86,4 +93,4 @@ if (errors.length) {
   console.error(errors.join("\n"));
   process.exit(1);
 }
-console.log(`production smoke passed: ${endpoint} (${expectedVersion}${expectedCommit ? ` @ ${expectedCommit}` : ""}, ${expectedTools} read-only tools, signed Evidence Graph)`);
+console.log(`production smoke passed: ${endpoint} (${expectedVersion}${expectedCommit ? ` @ ${expectedCommit}` : ""}, ${expectedTools} read-only tools, signed Evidence Graph, selected-repository GitHub App reads)`);
