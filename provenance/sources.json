@@ -48,11 +48,11 @@
     },
     {
       "repository": "https://github.com/AyobamiH/donestate",
-      "commit": "f15e49c3db5c4e14bcb597f9c3dae3340d6cf490",
-      "version": "0.2.0-preview",
+      "commit": "9e33a7e4c8505eabd24df775e8292bfaa2906f43",
+      "version": "verification-contract-v2",
       "license": "Apache-2.0",
-      "role": "DoneState v2 verification handoff, attestation schemas, trust bindings and portable compatibility vector",
-      "integration": "independent read-only verifier adapter",
+      "role": "DoneState v2 handoff plus complete verification response contract, strict report/attestation schemas and deterministic verifier vectors",
+      "integration": "independent read-only verifier adapter with byte-identical contract mirror",
       "modifiedUpstream": false
     },
     {
