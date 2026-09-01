@@ -19,6 +19,17 @@ const EDGE_TYPES = new Set([
   "addresses", "claims", "authorizes", "verifies", "contradicts", "supersedes",
 ]);
 const VERDICTS = new Set(["VERIFIED", "PARTIAL", "CONTRADICTED", "UNPROVEN"]);
+const RELEASE_SCOPE = Object.freeze([
+  "branch_protection",
+  "deployment_commit_binding",
+  "migration_coverage",
+  "migration_safety",
+  "publication_state",
+  "release_readiness",
+  "rollback_viability",
+  "runtime_correctness",
+  "runtime_reachability",
+]);
 
 function isoTime(value) {
   const date = new Date(value || Date.now());
@@ -71,6 +82,24 @@ function overallVerdict(assertions, contradictions) {
   if (assertions.length && assertions.every((item) => item.verdict === "VERIFIED")) return "VERIFIED";
   if (assertions.some((item) => item.verdict === "VERIFIED")) return "PARTIAL";
   return "UNPROVEN";
+}
+
+function assessedScope(nodes) {
+  const assessed = ["ci_commit_binding", "repository_head", "repository_identity"];
+  if (matching(nodes, "runtime_observation").length) assessed.push("deployment_commit_binding", "runtime_reachability");
+  if (matching(nodes, "action_request").length || matching(nodes, "action_authorization").length
+    || matching(nodes, "execution_receipt").length || matching(nodes, "verification_result").length) {
+    assessed.push("protocol_artifact_integrity");
+  }
+  return [...new Set(assessed)].sort();
+}
+
+function graphScope(nodes) {
+  const assessed = assessedScope(nodes);
+  return {
+    assessed,
+    notAssessed: RELEASE_SCOPE.filter((dimension) => !assessed.includes(dimension)),
+  };
 }
 
 function matching(nodes, type) {
@@ -321,6 +350,35 @@ export async function buildEvidenceGraph({ repositorySnapshot, deploymentReport 
     }));
   }
 
+  const scope = graphScope(nodes);
+  const scopeNode = await evidenceNode({
+    id: nodeId("finding", repositoryIdentity || repository.fullName, "assessment-scope"),
+    type: "finding",
+    subjectRef: { provider: "github", repositoryId: repositoryIdentity, repositoryName: repository.fullName },
+    source: source("opstruth-rule-engine", "assessment-scope-v1"),
+    observedAt: time,
+    authority: authority("public"),
+    freshUntil: null,
+    status: "OBSERVED",
+    attributes: {
+      kind: "assessment_scope",
+      assessed: scope.assessed,
+      notAssessed: scope.notAssessed,
+      statement: "Repository identity and available exact-head CI evidence are scoped assertions; release readiness remains unproven.",
+    },
+  });
+  nodes.push(scopeNode);
+  edges.push(await evidenceEdge({
+    id: edgeId("addresses", scopeNode.id, repositoryNode.id, "assessment-scope"),
+    from: scopeNode.id,
+    to: repositoryNode.id,
+    type: "addresses",
+    source: source("opstruth-rule-engine", "assessment-scope-v1"),
+    observedAt: time,
+    basis: "observed",
+    evidenceNodeIds: [scopeNode.id, repositoryNode.id],
+  }));
+
   const contradictions = detectContradictions(nodes);
   edges.push(...await contradictionEdges(contradictions, nodes, time));
   const assertions = [];
@@ -349,6 +407,14 @@ export async function buildEvidenceGraph({ repositorySnapshot, deploymentReport 
       null,
     ));
   }
+  assertions.push(assertion(
+    "release.readiness",
+    "UNPROVEN",
+    "Repository and observed CI evidence do not establish deployment, publication, migration, rollback, or release readiness.",
+    [scopeNode.id, repositoryNode.id, commitNode?.id, currentCi?.id].filter(Boolean),
+    "independently verified release readiness",
+    null,
+  ));
   const verdict = overallVerdict(assertions, contradictions);
   ensureLimits(nodes, edges);
   nodes.sort((left, right) => left.id.localeCompare(right.id));
@@ -434,6 +500,21 @@ export async function verifyEvidenceGraph(graph, options = {}) {
   if (counts.edges !== edges.length) errors.push("graph_edge_count_mismatch");
   if (counts.contradictions !== computedContradictions.length) errors.push("graph_contradiction_count_mismatch");
   if (counts.unproven !== assertions.filter((item) => item.verdict === "UNPROVEN").length) errors.push("graph_unproven_count_mismatch");
+  const scopeNodes = matching(nodes, "finding").filter((node) => node.attributes?.kind === "assessment_scope");
+  const hasScopedAssessment = scopeNodes.length > 0;
+  const expectedScope = graphScope(nodes);
+  const releaseAssertions = assertions.filter((item) => item.assertionId === "release.readiness");
+  if (hasScopedAssessment) {
+    if (scopeNodes.length !== 1
+      || typeof scopeNodes[0].attributes?.statement !== "string"
+      || canonicalJson(scopeNodes[0].attributes?.assessed || []) !== canonicalJson(expectedScope.assessed)
+      || canonicalJson(scopeNodes[0].attributes?.notAssessed || []) !== canonicalJson(expectedScope.notAssessed)) {
+      errors.push("graph_scope_summary_mismatch");
+    }
+    if (releaseAssertions.length !== 1 || releaseAssertions[0].verdict !== "UNPROVEN") errors.push("graph_release_readiness_scope_invalid");
+  } else if (releaseAssertions.length) {
+    errors.push("graph_scope_summary_missing");
+  }
   const expectedVerdict = overallVerdict(assertions, computedContradictions);
   if (!VERDICTS.has(graph?.summary?.verdict) || graph?.summary?.verdict !== expectedVerdict) errors.push("graph_verdict_invalid");
   try {
@@ -451,26 +532,70 @@ export async function verifyEvidenceGraph(graph, options = {}) {
     trusted: protocol.trusted,
     integrity: protocol.signatureValid ? "signed" : protocol.digestValid ? "digest_only" : "invalid",
     signerFingerprint: protocol.signerFingerprint,
+    scopeIntegrity: hasScopedAssessment ? "scoped" : "legacy_unscoped",
+    releaseReadiness: "UNPROVEN",
     staleNodeIds,
     errors: [...new Set(errors)],
   };
 }
 
-function mapById(values) {
-  return new Map((values || []).map((value) => [value.id, value]));
+function semanticNodeKey(node) {
+  if (node.type === "runtime_observation") {
+    return canonicalJson({ type: node.type, subjectRef: node.subjectRef });
+  }
+  return node.id;
+}
+
+function semanticNodeValue(node) {
+  return withoutFields(node, ["id", "digest", "observedAt", "freshUntil"]);
+}
+
+function semanticEdgeKey(edge, nodeKeys) {
+  return canonicalJson({
+    type: edge.type,
+    from: nodeKeys.get(edge.from) || edge.from,
+    to: nodeKeys.get(edge.to) || edge.to,
+    suffix: String(edge.id || "").split(":").at(-1) || "evidence",
+  });
+}
+
+function semanticEdgeValue(edge, nodeKeys) {
+  return {
+    ...withoutFields(edge, ["id", "digest", "observedAt", "from", "to", "evidenceNodeIds"]),
+    from: nodeKeys.get(edge.from) || edge.from,
+    to: nodeKeys.get(edge.to) || edge.to,
+    evidenceNodeIds: (edge.evidenceNodeIds || []).map((id) => nodeKeys.get(id) || id).sort(),
+  };
+}
+
+function semanticContradictionKey(item, nodeKeys) {
+  return canonicalJson({
+    rule: item.rule,
+    nodeKeys: (item.nodeIds || []).map((id) => nodeKeys.get(id) || id).sort(),
+  });
+}
+
+function mapSemantic(values, keyFor, valueFor) {
+  const result = new Map();
+  for (const value of values || []) {
+    const key = keyFor(value);
+    if (result.has(key)) throw new Error("evidence_graph_semantic_identity_collision");
+    result.set(key, { id: value.id, value: valueFor(value), freshUntil: value.freshUntil });
+  }
+  return result;
 }
 
 function changedIds(before, after, comparedAt) {
   const added = [];
   const removed = [];
   const changed = [];
-  for (const [id, value] of after) {
-    if (!before.has(id)) added.push(id);
-    else if (before.get(id).digest !== value.digest) changed.push(id);
+  for (const [key, item] of after) {
+    if (!before.has(key)) added.push(item.id);
+    else if (canonicalJson(before.get(key).value) !== canonicalJson(item.value)) changed.push(item.id);
   }
-  for (const id of before.keys()) if (!after.has(id)) removed.push(id);
+  for (const [key, item] of before) if (!after.has(key)) removed.push(item.id);
   const timestamp = Date.parse(comparedAt);
-  const stale = [...after.values()].filter((value) => value.freshUntil && Date.parse(value.freshUntil) <= timestamp).map((value) => value.id).sort();
+  const stale = [...after.values()].filter((item) => item.freshUntil && Date.parse(item.freshUntil) <= timestamp).map((item) => item.id).sort();
   return { added: added.sort(), removed: removed.sort(), changed: changed.sort(), stale };
 }
 
@@ -491,8 +616,19 @@ export async function compareEvidenceGraphs(before, after, options = {}) {
   if (!beforeSubject.repositoryId || beforeSubject.repositoryId !== afterSubject.repositoryId || beforeSubject.provider !== afterSubject.provider) {
     throw new Error("evidence_graph_subject_incompatible");
   }
-  const nodeChanges = changedIds(mapById(before.nodes), mapById(after.nodes), comparedAt);
-  const edgeChanges = changedIds(mapById(before.edges), mapById(after.edges), comparedAt);
+  const beforeNodeKeys = new Map((before.nodes || []).map((node) => [node.id, semanticNodeKey(node)]));
+  const afterNodeKeys = new Map((after.nodes || []).map((node) => [node.id, semanticNodeKey(node)]));
+  const nodeChanges = changedIds(
+    mapSemantic(before.nodes, semanticNodeKey, semanticNodeValue),
+    mapSemantic(after.nodes, semanticNodeKey, semanticNodeValue),
+    comparedAt,
+  );
+  const edgeChanges = changedIds(
+    mapSemantic(before.edges, (edge) => semanticEdgeKey(edge, beforeNodeKeys), (edge) => semanticEdgeValue(edge, beforeNodeKeys)),
+    mapSemantic(after.edges, (edge) => semanticEdgeKey(edge, afterNodeKeys), (edge) => semanticEdgeValue(edge, afterNodeKeys)),
+    comparedAt,
+  );
+  const beforeContradictions = new Set((before.summary?.contradictions || []).map((item) => semanticContradictionKey(item, beforeNodeKeys)));
   const payload = {
     schema: "opstruth.evidence-delta",
     schemaVersion: "1.0.0",
@@ -503,7 +639,7 @@ export async function compareEvidenceGraphs(before, after, options = {}) {
     nodeChanges,
     edgeChanges,
     verdictTransition: { from: before.summary?.verdict || "UNPROVEN", to: after.summary?.verdict || "UNPROVEN" },
-    newlyContradicted: (after.summary?.contradictions || []).filter((item) => !(before.summary?.contradictions || []).some((prior) => prior.rule === item.rule && prior.nodeIds.join("|") === item.nodeIds.join("|"))),
+    newlyContradicted: (after.summary?.contradictions || []).filter((item) => !beforeContradictions.has(semanticContradictionKey(item, afterNodeKeys))),
   };
   return { ...payload, digest: await canonicalDigest(DELTA_DOMAIN, payload) };
 }

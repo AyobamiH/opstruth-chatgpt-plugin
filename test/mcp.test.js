@@ -222,8 +222,10 @@ test("MCP creates and compares caller-held signed evidence snapshots", async () 
     }, request, env, {});
     const graph = snapshotResponse.result.structuredContent;
     assert.equal(graph.schema, "opstruth.evidence-graph");
-    assert.equal(graph.summary.verdict, "VERIFIED");
+    assert.equal(graph.summary.verdict, "PARTIAL");
+    assert.ok(graph.nodes.find((node) => node.attributes?.kind === "assessment_scope")?.attributes.notAssessed.includes("release_readiness"));
     assert.equal(graph.proof.signerFingerprint.startsWith("sha256:"), true);
+    assert.match(snapshotResponse.result.content[0].text, /release readiness remains unproven/i);
 
     const deltaResponse = await handleRpc({
       jsonrpc: "2.0", id: 82, method: "tools/call",
