@@ -15,11 +15,13 @@
     "package.json",
     "wrangler.jsonc",
     ".github/CODEOWNERS",
-    ".github/maintainer/policy.json"
+    ".github/maintainer/policy.json",
+    "test/governance.test.js"
   ],
   "protectedPrefixes": [
     ".github/workflows/",
     "contracts/",
+    "governance/",
     "schemas/",
     "docs/architecture/",
     "docs/adr/",
@@ -48,6 +50,7 @@
     "skills/",
     ".github/",
     "contracts/",
+    "governance/",
     "schemas/",
     "src/canonical.js",
     "src/evidence-graph.js",

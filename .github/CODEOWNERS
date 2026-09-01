@@ -9,6 +9,7 @@ docs/adr/ @AyobamiH
 .github/CODEOWNERS @AyobamiH
 .github/maintainer/ @AyobamiH
 .github/workflows/ @AyobamiH
+governance/ @AyobamiH
 scripts/generate-signing-key.mjs @AyobamiH
 scripts/check-boundaries.mjs @AyobamiH
 scripts/maintainer-review.mjs @AyobamiH
@@ -22,6 +23,7 @@ src/protocol.js @AyobamiH
 src/schema-validation.js @AyobamiH
 test/architecture-boundary.test.js @AyobamiH
 test/contracts.test.js @AyobamiH
+test/governance.test.js @AyobamiH
 test/maintainer-review.test.js @AyobamiH
 package.json @AyobamiH
 wrangler.jsonc @AyobamiH
