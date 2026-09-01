@@ -1,3 +1,5 @@
+import { compareInternalAndExternalProbes, mcpRequest } from "./lib/production-smoke.mjs";
+
 const endpoint = String(process.env.OPSTRUTH_PRODUCTION_URL || "https://mcp.opstruth.io").replace(/\/$/, "");
 const expectedVersion = process.env.OPSTRUTH_EXPECTED_VERSION || "0.4.0";
 const expectedCommit = process.env.OPSTRUTH_EXPECTED_COMMIT || null;
@@ -14,19 +16,19 @@ async function request(path, init = {}) {
 }
 
 async function mcpCall(id, method, params = {}) {
-  const response = await request("/mcp", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
-  });
+  const call = mcpRequest(id, method, params);
+  const response = await request(call.path, call.init);
   if (!response) return {};
   if (!response.ok) errors.push(`/mcp ${method}: HTTP ${response.status}`);
   return response.json().catch(() => ({}));
 }
 
-for (const path of ["/health", "/signing-key", "/privacy", "/terms", "/support"]) {
+const publicProbePaths = ["/health", "/privacy", "/terms", "/support"];
+const externalStatuses = {};
+for (const path of [...publicProbePaths, "/signing-key"]) {
   const response = await request(path);
   if (!response) continue;
+  if (publicProbePaths.includes(path)) externalStatuses[path] = response.status;
   if (!response.ok) errors.push(`${path}: HTTP ${response.status}`);
   if (path === "/health") {
     const body = await response.json().catch(() => ({}));
@@ -54,7 +56,15 @@ if (new Set(tools.map((tool) => tool.name)).size !== expectedTools) errors.push(
 if (tools.some((tool) => tool.annotations?.readOnlyHint !== true)) errors.push("/mcp tools/list: every tool must be explicitly read-only");
 if (!tools.some((tool) => tool.name === "opstruth_snapshot_evidence")) errors.push("/mcp tools/list: Evidence Graph snapshot tool missing");
 
-const snapshot = await mcpCall(3, "tools/call", {
+const internalProbe = await mcpCall(3, "tools/call", {
+  name: "opstruth_probe_deployment",
+  arguments: { deployment_url: endpoint, health_paths: publicProbePaths },
+});
+const internalProbeReport = internalProbe.result?.structuredContent;
+if (internalProbe.result?.isError) errors.push("/mcp tools/call: internal deployment probe returned an error");
+errors.push(...compareInternalAndExternalProbes({ endpoint, paths: publicProbePaths, externalStatuses, internalReport: internalProbeReport }));
+
+const snapshot = await mcpCall(4, "tools/call", {
   name: "opstruth_snapshot_evidence",
   arguments: { repository_url: "AyobamiH/opstruth-chatgpt-plugin" },
 });
