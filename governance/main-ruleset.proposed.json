@@ -1,0 +1,164 @@
+{
+  "schema": "opstruth.main-governance-proposal",
+  "schemaVersion": "1.0.0",
+  "proposalState": "BLOCKED",
+  "repository": {
+    "name": "AyobamiH/opstruth-chatgpt-plugin",
+    "defaultBranch": "main",
+    "baseCommit": "186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5"
+  },
+  "providerObservation": {
+    "observedOn": "2026-09-01",
+    "source": "authenticated GitHub branch settings",
+    "mainProtection": "UNPROTECTED",
+    "scope": "provider state at observation time"
+  },
+  "activation": {
+    "permitted": false,
+    "blockers": [
+      {
+        "id": "second_trusted_human_reviewer",
+        "state": "UNSATISFIED",
+        "reviewer": null,
+        "requirement": "Name one trusted human other than the repository owner and grant only the access needed to approve pull requests."
+      }
+    ]
+  },
+  "ownership": {
+    "codeOwners": [
+      "@AyobamiH"
+    ],
+    "mergeAuthority": [
+      "@AyobamiH"
+    ],
+    "emergencyBypass": {
+      "actors": [
+        "@AyobamiH"
+      ],
+      "mode": "pull_request",
+      "directPush": false,
+      "forcePush": false,
+      "branchDeletion": false
+    }
+  },
+  "releaseChannelIdentity": {
+    "product": "OpsTruth",
+    "version": "0.4.0",
+    "sourceMainCommit": "186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5",
+    "chatgptDirectoryState": "PUBLISHED",
+    "changesDeploymentState": false,
+    "changesPublicationState": false,
+    "changesReleaseState": false
+  },
+  "hostedChecks": [
+    {
+      "context": "verify",
+      "workflowName": "CI",
+      "workflowPath": ".github/workflows/ci.yml",
+      "job": "verify",
+      "pullRequestTrigger": true,
+      "pathFiltered": false,
+      "jobCondition": null,
+      "required": true,
+      "sample": {
+        "pullRequest": 23,
+        "headCommit": "6e44130a70aa9616891629b170d839a1caccfab5",
+        "runId": 33484341570,
+        "jobId": 99780846732,
+        "conclusion": "success"
+      }
+    },
+    {
+      "context": "review",
+      "workflowName": "OpsTruth maintainer review",
+      "workflowPath": ".github/workflows/maintainer-review.yml",
+      "job": "review",
+      "pullRequestTrigger": true,
+      "pathFiltered": false,
+      "jobCondition": null,
+      "required": true,
+      "sample": {
+        "pullRequest": 23,
+        "headCommit": "6e44130a70aa9616891629b170d839a1caccfab5",
+        "runId": 33484341539,
+        "jobId": 99780847006,
+        "conclusion": "success"
+      }
+    },
+    {
+      "context": "deploy",
+      "workflowName": "Deploy MCP to Cloudflare",
+      "workflowPath": ".github/workflows/deploy-cloudflare.yml",
+      "job": "deploy",
+      "pullRequestTrigger": false,
+      "pathFiltered": true,
+      "jobCondition": null,
+      "required": false,
+      "exclusionReason": "The workflow runs on selected main changes and manual dispatch, so it is not an always-emitted pull-request check."
+    }
+  ],
+  "githubRuleset": {
+    "name": "OpsTruth main governance",
+    "target": "branch",
+    "enforcement": "disabled",
+    "bypass_actors": [
+      {
+        "actor_id": 47716486,
+        "actor_type": "User",
+        "bypass_mode": "pull_request"
+      }
+    ],
+    "conditions": {
+      "ref_name": {
+        "include": [
+          "~DEFAULT_BRANCH"
+        ],
+        "exclude": []
+      }
+    },
+    "rules": [
+      {
+        "type": "update",
+        "parameters": {
+          "update_allows_fetch_and_merge": false
+        }
+      },
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "pull_request",
+        "parameters": {
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ],
+          "dismiss_stale_reviews_on_push": true,
+          "require_code_owner_review": false,
+          "require_last_push_approval": true,
+          "required_approving_review_count": 1,
+          "required_review_thread_resolution": true
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "parameters": {
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "verify"
+            },
+            {
+              "context": "review"
+            }
+          ],
+          "strict_required_status_checks_policy": true
+        }
+      }
+    ]
+  }
+}
