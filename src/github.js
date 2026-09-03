@@ -767,7 +767,7 @@ export async function loadCommitVerificationEvidence({ repository: input, baseSh
   return {
     repository: {
       fullName: metadata.full_name,
-      providerRepositoryId: metadata.id === undefined || metadata.id === null ? null : String(metadata.id),
+      providerRepositoryId: metadata.id === undefined || metadata.id === null ? null : Number(metadata.id),
       htmlUrl: metadata.html_url,
       visibility: metadata.visibility,
       evidenceAuthority: client.authority,
