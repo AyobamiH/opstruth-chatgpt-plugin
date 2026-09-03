@@ -111,6 +111,8 @@ test("exact-commit verification uses only installation-authenticated API and Con
       paths: ["README.md"],
     }, appEnv({ GITHUB_READ_TOKEN: "legacy-token-must-not-be-used" }));
     assert.equal(evidence.files[0].text, CONTENT);
+    assert.equal(evidence.repository.providerRepositoryId, 424242);
+    assert.equal(typeof evidence.repository.providerRepositoryId, "number");
     assert.deepEqual(evidence.repository.evidenceAuthority, {
       mode: "github_app_installation",
       scope: "selected_public_repository",

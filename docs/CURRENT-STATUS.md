@@ -49,3 +49,11 @@ Maintainer bot v0 remains a deterministic, contents-read evidence source. It can
 ## Deferred scope
 
 Private-repository evidence brokerage, managed longitudinal storage, a verifier fleet, and higher maintainer write stages remain deferred. OpsTruth does not execute repair, merge, deployment, or release actions against inspected systems.
+
+## 2026-09-03 DoneState v2 repository-subject identity repair
+
+- Production DoneState canary #114 reached OpsTruth v2 after its exact-head CI passed, and the deployed verifier returned HTTP 200.
+- DoneState correctly rejected the response because `report.subject.providerRepositoryId` was a string even though the shared verification-report schema requires an integer or null.
+- Root cause is isolated to the exact-commit GitHub verification evidence adapter: GitHub supplies a numeric repository ID, but OpsTruth converted it with `String(metadata.id)` before building the signed report.
+- This repair converts only the exact-commit verification evidence repository ID to `Number(metadata.id)` and adds a regression assertion that the value remains numeric. General repository-audit snapshot semantics are unchanged.
+- Completion remains unproven until this source revision passes the full repository check, is deployed, and a fresh DoneState canary reaches the complete sealed-handoff -> OpsTruth v2 -> DoneState `VERIFIED` chain.
