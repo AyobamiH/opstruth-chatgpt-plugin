@@ -1,0 +1,41 @@
+{
+  "schema": "opstruth.provider-enforcement-readback",
+  "schemaVersion": 1,
+  "observedAt": "2026-09-04T05:48:38.670+01:00",
+  "repository": "AyobamiH/opstruth-chatgpt-plugin",
+  "branch": "main",
+  "mainHead": "49107f4476e8aa43c2beb1977319a0310d1ccf8b",
+  "protected": true,
+  "activeRuleset": {
+    "id": 22247265,
+    "name": "OpsTruth main mechanical governance",
+    "enforcement": "active",
+    "target": "branch",
+    "include": ["refs/heads/main"],
+    "exclude": [],
+    "rules": ["deletion", "non_fast_forward", "pull_request", "required_status_checks"],
+    "requiredApprovals": 0,
+    "requiredReviewThreadResolution": true,
+    "strictRequiredStatusChecks": true,
+    "requiredStatusChecks": [
+      {"context": "verify", "integrationId": 15368},
+      {"context": "review", "integrationId": 15368}
+    ],
+    "ownerEmergencyBypass": {"actorId": 47716486, "actorType": "User", "mode": "always"}
+  },
+  "providerNormalisation": {
+    "requireExtraApprovalForUnattributedChanges": true
+  },
+  "postMergeValidation": {
+    "deployWorkflowRunId": 33835185790,
+    "deploy": "success",
+    "verifyWorkflowRunId": 33835185829,
+    "verify": "success"
+  },
+  "invariants": {
+    "doneStateCanaryPullRequest115MustRemainOpenUnmerged": true,
+    "historicalDoneStateRunOutcomesMustNotBeRewritten": true,
+    "readOnlyVerificationAuthorityMustRemain": true,
+    "independentHumanReviewRemainsFollowOn": true
+  }
+}
