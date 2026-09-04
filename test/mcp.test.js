@@ -108,7 +108,7 @@ test("feedback endpoint accepts only bounded reason codes", async () => {
   await Promise.all(pending);
   assert.equal(accepted.status, 202);
   assert.deepEqual((await accepted.json()).retainedFields, ["reason", "surface", "version"]);
-  assert.deepEqual(writes[0].blobs, ["feedback", "useful", "mcp", "0.4.0"]);
+  assert.deepEqual(writes[0].blobs, ["feedback", "useful", "mcp", "0.4.1"]);
 
   const rejected = await worker.fetch(new Request("https://example.test/feedback", {
     method: "POST",
@@ -209,9 +209,7 @@ test("sandbox verification tool returns an approval-gated handoff without execut
 test("non-GitHub repository request fails closed without mutation", async () => {
   const request = new Request("https://example.test/mcp", { method: "POST" });
   const result = await handleRpc({
-    jsonrpc: "2.0",
-    id: 5,
-    method: "tools/call",
+    jsonrpc: "2.0", id: 5, method: "tools/call",
     params: { name: "opstruth_inspect_repository", arguments: { repository_url: "https://evil.example/repo" } },
   }, request, {}, {});
   assert.equal(result.result.isError, true);

@@ -10,7 +10,7 @@ test("analytics stores bounded aggregate dimensions only", () => {
     verdict: "insufficient_evidence", counts: { evidence: 4, warnings: 2, failures: 0, notVerified: 3 }, ciObserved: true, signedEvidence: true,
   });
   assert.deepEqual(point.indexes, ["opstruth_audit_repository"]);
-  assert.deepEqual(point.blobs, ["tool_call", "opstruth_audit_repository", "success", "chatgpt", "0.4.0", "insufficient_evidence", "ci_observed", "deployment_not_probed", "evidence_signed"]);
+  assert.deepEqual(point.blobs, ["tool_call", "opstruth_audit_repository", "success", "chatgpt", "0.4.1", "insufficient_evidence", "ci_observed", "deployment_not_probed", "evidence_signed"]);
   assert.deepEqual(point.doubles, [42, 200, 4, 2, 0, 3]);
 });
 
@@ -33,7 +33,7 @@ test("analytics v2 derives only bounded non-identifying result dimensions", () =
 
 test("feedback is reason-coded with no free text or subject identifier", async () => {
   assert.deepEqual(feedbackPoint({ reason: "useful", surface: "mcp" }), {
-    indexes: ["feedback"], blobs: ["feedback", "useful", "mcp", "0.4.0"], doubles: [1],
+    indexes: ["feedback"], blobs: ["feedback", "useful", "mcp", "0.4.1"], doubles: [1],
   });
   assert.throws(() => feedbackPoint({ reason: "my repository is broken", surface: "mcp" }), /reason_invalid/);
   const writes = [];
