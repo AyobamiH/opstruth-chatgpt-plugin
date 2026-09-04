@@ -69,7 +69,7 @@ jobs:
         run: npx --yes wrangler@4.127.0 deploy --var OPSTRUTH_BUILD_COMMIT:${GITHUB_SHA}
       - name: Smoke test production routes
         env:
-          OPSTRUTH_EXPECTED_VERSION: 0.4.0
+          OPSTRUTH_EXPECTED_VERSION: 0.4.1
           OPSTRUTH_EXPECTED_COMMIT: ${{ github.sha }}
           OPSTRUTH_PRODUCTION_URL: https://mcp.opstruth.io
         run: npm run smoke:production
