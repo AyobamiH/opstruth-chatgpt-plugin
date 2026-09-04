@@ -1,0 +1,80 @@
+{
+  "schema": "proofandstate.distribution-release-candidate.v1",
+  "preparedAt": "2026-09-04",
+  "product": "OpsTruth",
+  "repository": "AyobamiH/opstruth-chatgpt-plugin",
+  "repositoryTruth": {
+    "head": "fef198778b95787bbc6d9e5557f82afbc0fe6f01",
+    "runtimeChangedSinceDeployedSource": false,
+    "commitsSinceDeployedSource": 6,
+    "latestContractDriftRun": 33855472944,
+    "latestContractDriftConclusion": "success"
+  },
+  "runtime": {
+    "sourceCommit": "49107f4476e8aa43c2beb1977319a0310d1ccf8b",
+    "postMergeCiRun": 33835185829,
+    "deploymentRun": 33835185790,
+    "deploymentConclusion": "success",
+    "canonicalMcpEndpoint": "https://mcp.opstruth.io/mcp",
+    "authorityMode": "READ_ONLY_INDEPENDENT_EVIDENCE"
+  },
+  "plugin": {
+    "manifestVersion": "0.4.0",
+    "displayName": "OpsTruth",
+    "developerName": "AYOBAMI JOHN HAASTRUP",
+    "category": "Developer Tools",
+    "existingPluginListingRef": "plugins_6a8d4dc60bf081918a06094873890eb4"
+  },
+  "existingOpenAIDirectoryRelease": {
+    "version": "0.4.0",
+    "stateRecordedInRepository": "PUBLIC",
+    "releaseSourceCommit": "186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5",
+    "releaseCiRun": 33341464435,
+    "releaseDeploymentRun": 33341464399,
+    "metadataOrigin": "https://opstruth-chatgpt.woeinvests.workers.dev/",
+    "commitsFromReleaseSourceToCurrentHead": 43,
+    "cleanAccountInstall": "UNPROVEN",
+    "realToolOutcome": "UNPROVEN",
+    "disposition": "PUBLIC_LISTING_REQUIRES_CURRENT_RUNTIME_AND_METADATA_UPDATE"
+  },
+  "currentVerifierCapabilities": {
+    "doneStateContract": "donestate.verification-contract.v2",
+    "authenticatedGitHubEvidence": true,
+    "shortLivedInstallationCredentials": true,
+    "exactHeadReobservation": true,
+    "completeResponseBundle": true,
+    "failClosedOnMalformedOrIncompleteEvidence": true,
+    "targetMutationAuthority": false,
+    "contractDriftSentinel": "HOURLY_READ_ONLY"
+  },
+  "productionProof": {
+    "doneStateSuccessorIssue": 114,
+    "doneStateRunId": "c4a07fa6-90b2-4597-a4c6-eae66de5a3e8",
+    "doneStatePullRequest": 115,
+    "doneStateExactHead": "41f1ae3b0fed670e64bd99f1bcb1aea9c9e7e869",
+    "firstMalformedResponseRejected": true,
+    "repairedVerifierSource": "eef00ca4f242cf99d6b39e8c37ae4b84970a86e4",
+    "finalResponse": "COMPLETE_VERIFIED_V2",
+    "doneStateTerminalOutcome": "VERIFIED"
+  },
+  "openAIProviderAction": {
+    "target": "EXISTING_OPSTRUTH_PLUGIN_LISTING",
+    "actionOrder": [
+      "OPEN_EXISTING_PUBLISHER_RECORD",
+      "READ_CURRENT_PROVIDER_STATE_AND_VISIBLE_VERSION",
+      "UPDATE_THE_EXISTING_PRODUCT_NOT_CREATE_A_DUPLICATE",
+      "SET_CANONICAL_METADATA_ORIGIN_TO_MCP_OPSTRUTH_IO",
+      "REFRESH_TOOL_AND_INPUT_SNAPSHOT_FROM_LIVE_CANONICAL_ENDPOINT",
+      "BIND_REVIEW_EVIDENCE_TO_DEPLOYED_RUNTIME_SOURCE_49107F",
+      "SUBMIT_OR_PUBLISH_THE_PROVIDER_SUPPORTED_UPDATE",
+      "RECORD_PROVIDER_VERSION_AND_REVIEW_ID",
+      "RUN_CLEAN_ACCOUNT_INSTALL_AND_ONE_REAL_TOOL_OUTCOME_AFTER_PROVIDER_PUBLICATION"
+    ],
+    "versionRule": "DO_NOT_INVENT_A_NEW_VERSION_IN_REPOSITORY. Keep 0.4.0 only if the provider explicitly supports refreshing the current listing snapshot under that version. If a new version is required, use the provider-supported next-version flow and record the resulting version before claiming publication.",
+    "doNot": ["CREATE_DUPLICATE_OPSTRUTH_PRODUCT", "LEAVE_WORKERS_DEV_AS_PRIMARY_METADATA_ORIGIN"]
+  },
+  "providerReferences": {
+    "openAIApps": "https://help.openai.com/en/articles/11487775",
+    "openAIAppsSdk": "https://help.openai.com/en/articles/12515353-build-with-the-apps-sdk"
+  }
+}
