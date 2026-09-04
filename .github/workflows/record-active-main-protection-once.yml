@@ -1,0 +1,144 @@
+name: Record active OpsTruth main protection once
+
+on:
+  push:
+    branches:
+      - automation/record-active-main-protection-20260904
+
+permissions:
+  contents: write
+
+jobs:
+  close-governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - run: git checkout -B governance/record-active-main-protection-20260904 origin/main
+      - name: Record active provider state
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'governance/main-ruleset.proposed.json';
+          const doc = JSON.parse(fs.readFileSync(path, 'utf8'));
+          doc.proposalState = 'ACTIVE';
+          doc.repository.baseCommit = '7cc308895cbbe06856cb4a3c80ff243a58eeb132';
+          doc.providerObservation = { observedOn: '2026-09-04', source: 'GitHub branch and ruleset API read-back plus enforcement probe PR #29', mainProtection: 'PROTECTED', requiredStatusEnforcement: 'ON', activeRulesets: 1, rulesetId: 22247265 };
+          doc.activation = { permitted: true, desiredEnforcement: 'active', artifactEnforcement: 'disabled', activatedAt: '2026-09-04T05:48:38.670+01:00', blockers: [] };
+          doc.stages.mechanicalBaseline.state = 'ACTIVE';
+          doc.activationReadBack = {
+            state: 'VERIFIED', observedAt: '2026-09-04T05:54:20+01:00', rulesetId: 22247265, providerEnforcement: 'active',
+            effectiveBranchRules: ['refs/heads/main only','pull request required','verify required via GitHub Actions integration 15368','review required via GitHub Actions integration 15368','strict target-branch freshness','resolved review conversations','deletion blocked','non-fast-forward blocked','zero required approvals','single owner emergency bypass'],
+            enforcementProbe: { pullRequest: 29, head: '6ec09aed203b8beb4b0358c064f29f5f1690a79b', verifyRun: 33838447356, reviewRun: 33838447326, mergeCommit: '7cc308895cbbe06856cb4a3c80ff243a58eeb132' }
+          };
+          fs.writeFileSync(path, JSON.stringify(doc, null, 2) + '\n');
+          NODE
+
+          cat > scripts/check-main-governance-proposal.mjs <<'EOF'
+          import { readFile } from "node:fs/promises";
+          import { fileURLToPath } from "node:url";
+          import { join } from "node:path";
+          const root = fileURLToPath(new URL("..", import.meta.url));
+          const manifest = JSON.parse(await readFile(join(root,"governance","main-ruleset.proposed.json"),"utf8"));
+          const ci = await readFile(join(root,".github","workflows","ci.yml"),"utf8");
+          const reviewWorkflow = await readFile(join(root,".github","workflows","maintainer-review.yml"),"utf8");
+          const status = await readFile(join(root,"docs","CURRENT-STATUS.md"),"utf8");
+          const readme = await readFile(join(root,"governance","README.md"),"utf8");
+          const codeowners = await readFile(join(root,".github","CODEOWNERS"),"utf8");
+          const readBack = JSON.parse(await readFile(join(root,"governance","provider-enforcement-readback.json"),"utf8"));
+          const req=(c,m)=>{if(!c)throw new Error(m)};
+          const exact=(a,e,m)=>{req(Array.isArray(a),m);req(JSON.stringify([...a].sort())===JSON.stringify([...e].sort()),m)};
+          req(manifest.schemaVersion==="2.0.0","schema drifted");
+          req(manifest.proposalState==="ACTIVE","provider protection must remain ACTIVE");
+          req(manifest.repository?.name==="AyobamiH/opstruth-chatgpt-plugin"&&manifest.repository?.repositoryId===1345997124,"repository identity drifted");
+          req(manifest.providerObservation?.mainProtection==="PROTECTED"&&manifest.providerObservation?.requiredStatusEnforcement==="ON","provider protection regressed");
+          req(manifest.providerObservation?.activeRulesets===1&&manifest.providerObservation?.rulesetId===22247265,"active ruleset identity drifted");
+          req(manifest.activation?.permitted===true&&manifest.activation?.blockers?.length===0,"active protection cannot retain blockers");
+          req(manifest.stages?.mechanicalBaseline?.state==="ACTIVE"&&manifest.stages.mechanicalBaseline.requiredApprovals===0,"Stage 1 drifted");
+          req(manifest.stages?.mechanicalBaseline?.requiresSecondHumanReviewer===false,"reviewer cannot block Stage 1");
+          req(manifest.stages?.independentHumanReview?.state==="FOLLOW_ON"&&manifest.stages.independentHumanReview.requiredApprovalsAfterActivation===1,"Stage 2 drifted");
+          req(manifest.ownership?.independentReviewer?.reviewer===null&&manifest.ownership?.independentReviewer?.state==="UNNAMED","do not invent reviewer");
+          req(codeowners.includes("* @AyobamiH"),"CODEOWNERS drifted");
+          exact(manifest.hostedChecks.filter(x=>x.required).map(x=>x.context),["verify","review"],"required checks drifted");
+          req(manifest.hostedChecks.filter(x=>x.required).every(x=>x.integrationId===15368),"required checks must be GitHub Actions");
+          req(/^name: CI$/m.test(ci)&&/^  pull_request:\s*$/m.test(ci)&&/^  verify:\s*$/m.test(ci),"CI must emit verify");
+          req(!/paths:|paths-ignore:|continue-on-error:/m.test(ci),"CI verify cannot be conditional");
+          req(/^name: OpsTruth maintainer review$/m.test(reviewWorkflow)&&/^  pull_request:/m.test(reviewWorkflow)&&/^  review:\s*$/m.test(reviewWorkflow),"review workflow must emit review");
+          req(!/paths:|paths-ignore:|continue-on-error:/m.test(reviewWorkflow),"review cannot be conditional");
+          const ruleset=manifest.githubRuleset;
+          req(ruleset?.target==="branch"&&ruleset?.enforcement==="disabled","checked-in ruleset must remain import-safe disabled template");
+          exact(ruleset?.conditions?.ref_name?.include,["refs/heads/main"],"ruleset target drifted");
+          exact(ruleset?.conditions?.ref_name?.exclude,[],"ruleset exclusions drifted");
+          req(ruleset?.bypass_actors?.length===1,"exactly one bypass required");
+          const b=ruleset.bypass_actors[0]; req(b.actor_id===47716486&&b.actor_type==="User"&&b.bypass_mode==="always","owner bypass drifted");
+          const rules=new Map(ruleset.rules.map(r=>[r.type,r])); for(const t of ["deletion","non_fast_forward","pull_request","required_status_checks"])req(rules.has(t),`missing ${t}`);
+          const pr=rules.get("pull_request").parameters; req(pr.required_approving_review_count===0&&pr.require_code_owner_review===false&&pr.require_last_push_approval===false&&pr.required_review_thread_resolution===true,"Stage 1 PR controls drifted");
+          const checks=rules.get("required_status_checks").parameters; exact(checks.required_status_checks.map(x=>x.context),["verify","review"],"ruleset checks drifted"); req(checks.required_status_checks.every(x=>x.integration_id===15368)&&checks.strict_required_status_checks_policy===true,"status policy drifted");
+          req(manifest.activationReadBack?.state==="VERIFIED"&&manifest.activationReadBack?.rulesetId===22247265&&manifest.activationReadBack?.providerEnforcement==="active","activation read-back drifted");
+          req(readBack?.protected===true&&readBack?.activeRuleset?.id===22247265,"durable provider read-back drifted");
+          exact(readBack.activeRuleset.requiredStatusChecks.map(x=>x.context),["verify","review"],"durable read-back checks drifted");
+          for(const text of [status,readme]){req(/PROTECTED/.test(text),"copy must state PROTECTED");req(/22247265/.test(text),"copy must record ruleset 22247265");req(!/main` is currently unprotected/i.test(text),"copy cannot claim unprotected");req(!/Status: `BLOCKED_PROVIDER_ACTION`/.test(text),"copy cannot claim blocked")}
+          console.log("OpsTruth main governance: active provider protection verified");
+          EOF
+
+          cat > test/governance.test.js <<'EOF'
+          import assert from "node:assert/strict";
+          import { readFile } from "node:fs/promises";
+          import test from "node:test";
+          const root=new URL("../",import.meta.url); const text=p=>readFile(new URL(p,root),"utf8"); const proposal=async()=>JSON.parse(await text("governance/main-ruleset.proposed.json")); const rule=(d,t)=>d.githubRuleset.rules.find(x=>x.type===t);
+          test("governance records active provider protection",async()=>{const d=await proposal();assert.equal(d.proposalState,"ACTIVE");assert.equal(d.repository.baseCommit,"7cc308895cbbe06856cb4a3c80ff243a58eeb132");assert.equal(d.providerObservation.mainProtection,"PROTECTED");assert.equal(d.providerObservation.requiredStatusEnforcement,"ON");assert.equal(d.providerObservation.activeRulesets,1);assert.equal(d.providerObservation.rulesetId,22247265);assert.equal(d.githubRuleset.enforcement,"disabled");assert.equal(d.activation.permitted,true);assert.equal(d.activation.blockers.length,0);assert.equal(d.stages.mechanicalBaseline.state,"ACTIVE");assert.equal(d.stages.mechanicalBaseline.requiredApprovals,0);assert.equal(d.activationReadBack.state,"VERIFIED")});
+          test("ruleset template preserves Stage 1 controls",async()=>{const d=await proposal();assert.ok(rule(d,"deletion"));assert.ok(rule(d,"non_fast_forward"));assert.deepEqual(d.githubRuleset.bypass_actors,[{actor_id:47716486,actor_type:"User",bypass_mode:"always"}]);assert.equal(rule(d,"pull_request").parameters.required_approving_review_count,0);assert.deepEqual(rule(d,"required_status_checks").parameters.required_status_checks,[{context:"verify",integration_id:15368},{context:"review",integration_id:15368}])});
+          test("provider read-back and governance copy agree",async()=>{const [d,r,readme,status]=await Promise.all([proposal(),text("governance/provider-enforcement-readback.json").then(JSON.parse),text("governance/README.md"),text("docs/CURRENT-STATUS.md")]);assert.equal(r.protected,true);assert.equal(r.activeRuleset.id,22247265);assert.deepEqual(r.activeRuleset.requiredStatusChecks.map(x=>x.context),["verify","review"]);for(const c of [readme,status]){assert.match(c,/PROTECTED/);assert.match(c,/22247265/);assert.doesNotMatch(c,/Status: `BLOCKED_PROVIDER_ACTION`/);assert.doesNotMatch(c,/main` is currently unprotected/i)}assert.equal(d.releaseChannelIdentity.changesDeploymentState,false);assert.equal(d.releaseChannelIdentity.changesPublicationState,false);assert.equal(d.releaseChannelIdentity.changesReleaseState,false)});
+          EOF
+
+          cat > governance/README.md <<'EOF'
+          # Main governance
+
+          Status: `ACTIVE`
+
+          OpsTruth `main` is **PROTECTED** at the GitHub provider layer by active ruleset **22247265**, `OpsTruth main mechanical governance`, targeting only `refs/heads/main`.
+
+          ## Active Stage 1 mechanical baseline
+
+          The provider-enforced baseline requires every normal `main` update through a pull request, exact `verify` and `review` checks pinned to GitHub Actions integration `15368`, strict target freshness, resolved review conversations, deletion blocking, non-fast-forward blocking, zero required human approvals, and one owner emergency bypass in `always` mode.
+
+          Enforcement was proven through governance-only PR #29. Exact head `6ec09aed203b8beb4b0358c064f29f5f1690a79b` ran CI `33838447356` and maintainer review `33838447326`; both required checks succeeded before normal merge `7cc308895cbbe06856cb4a3c80ff243a58eeb132`. Activation issue #28 closed completed.
+
+          The `githubRuleset` object in `main-ruleset.proposed.json` intentionally remains an import-safe `disabled` template. Provider truth is recorded by `providerObservation`, `activationReadBack`, and `provider-enforcement-readback.json`.
+
+          ## Stage 2
+
+          After a trusted human other than the owner is named, strengthen the active ruleset with one independent approval. Stage 2 may only add constraints and must not weaken Stage 1. Automated OpsTruth, DoneState, GitHub Actions, bot, or agent output does not count as independent human approval.
+
+          ## Exact hosted checks
+
+          `verify` comes from `CI`; `review` comes from `OpsTruth maintainer review`. Both are unfiltered pull-request jobs. The Cloudflare `deploy` job is excluded because it is not always emitted on pull requests.
+
+          ## Drift response
+
+          Treat protection as regressed if ruleset 22247265 is disabled, deleted, retargeted, loses either required check, stops requiring target freshness or resolved conversations, or stops blocking deletion/non-fast-forward updates. Normal work must not use the owner emergency bypass.
+
+          Main protection does not itself publish, release, deploy, or alter OpenAI directory state.
+          EOF
+
+          node <<'NODE'
+          const fs=require('fs'); const p='docs/CURRENT-STATUS.md'; let t=fs.readFileSync(p,'utf8'); const r=`## Maintainer and main-branch governance\n\nMaintainer bot v0 remains a deterministic, contents-read evidence source. It cannot approve, merge, deploy, release, or sign verification for its own change.\n\n\`main\` is now **PROTECTED** by active GitHub repository ruleset **22247265**, \`OpsTruth main mechanical governance\`, targeting only \`refs/heads/main\`. Stage 1 requires pull requests, always-emitted \`verify\` and \`review\` checks pinned to GitHub Actions integration \`15368\`, strict target freshness, resolved review conversations, deletion blocking, and non-fast-forward blocking with zero required human approvals and one owner emergency bypass.\n\nProvider enforcement was proven with PR #29 at exact head \`6ec09aed203b8beb4b0358c064f29f5f1690a79b\`. CI \`33838447356\` passed \`verify\` and maintainer review \`33838447326\` passed \`review\`; only after both cleared did the PR merge normally as \`7cc308895cbbe06856cb4a3c80ff243a58eeb132\`. Issue #28 is closed completed. \`npm run validate:main-governance\` now fails if provider protection, ruleset identity, required checks, main-only targeting, destructive-ref blocking, or the zero-approval Stage 1 baseline drifts.\n\nA second trusted human reviewer remains a follow-on Stage 2 strengthening step and may not weaken Stage 1. CODEOWNERS still names only \`@AyobamiH\`, and the owner remains the only merge authority.\n\nSecurity, authentication, deployment, release, and evidence-contract changes remain authority-sensitive.\n\n`; t=t.replace(/## Maintainer and main-branch governance\n\n[\s\S]*?(?=## Deferred scope)/,r); fs.writeFileSync(p,t);
+          NODE
+      - name: Validate closure
+        run: |
+          npm ci
+          npm run check
+      - name: Commit closure branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add governance/main-ruleset.proposed.json governance/README.md docs/CURRENT-STATUS.md scripts/check-main-governance-proposal.mjs test/governance.test.js
+          git commit -m "Record active OpsTruth main protection"
+          git push --force-with-lease origin HEAD:governance/record-active-main-protection-20260904
