@@ -4,22 +4,30 @@
   "product": "OpsTruth",
   "repository": "AyobamiH/opstruth-chatgpt-plugin",
   "repositoryTruth": {
-    "head": "fef198778b95787bbc6d9e5557f82afbc0fe6f01",
+    "baseHead": "a4cfc04e369bd3342f0e199f737d67b6bcbe0389",
     "runtimeChangedSinceDeployedSource": false,
-    "commitsSinceDeployedSource": 6,
+    "commitsSinceDeployedSourceBeforeVersionCut": 6,
     "latestContractDriftRun": 33855472944,
     "latestContractDriftConclusion": "success"
   },
+  "releaseVersionDecision": {
+    "version": "0.4.1",
+    "previousPublicVersion": "0.4.0",
+    "reason": "The public 21-tool contract is preserved while the verifier implementation, authenticated exact-head evidence path and DoneState v2 response semantics matured. OpenAI requires a new plugin version to change a reviewed MCP metadata or skill snapshot.",
+    "toolCount": 21,
+    "toolCatalogueChanged": false
+  },
   "runtime": {
-    "sourceCommit": "49107f4476e8aa43c2beb1977319a0310d1ccf8b",
-    "postMergeCiRun": 33835185829,
-    "deploymentRun": 33835185790,
-    "deploymentConclusion": "success",
+    "preVersionCutSourceCommit": "49107f4476e8aa43c2beb1977319a0310d1ccf8b",
+    "preVersionCutCiRun": 33835185829,
+    "preVersionCutDeploymentRun": 33835185790,
+    "preVersionCutDeploymentConclusion": "success",
     "canonicalMcpEndpoint": "https://mcp.opstruth.io/mcp",
-    "authorityMode": "READ_ONLY_INDEPENDENT_EVIDENCE"
+    "authorityMode": "READ_ONLY_INDEPENDENT_EVIDENCE",
+    "releaseRequirement": "Deploy the merged 0.4.1 release commit and bind the provider scan to that exact deployed source before submitting the new plugin version."
   },
   "plugin": {
-    "manifestVersion": "0.4.0",
+    "manifestVersion": "0.4.1",
     "displayName": "OpsTruth",
     "developerName": "AYOBAMI JOHN HAASTRUP",
     "category": "Developer Tools",
@@ -32,10 +40,10 @@
     "releaseCiRun": 33341464435,
     "releaseDeploymentRun": 33341464399,
     "metadataOrigin": "https://opstruth-chatgpt.woeinvests.workers.dev/",
-    "commitsFromReleaseSourceToCurrentHead": 43,
+    "commitsFromReleaseSourceToPreVersionCutHead": 43,
     "cleanAccountInstall": "UNPROVEN",
     "realToolOutcome": "UNPROVEN",
-    "disposition": "PUBLIC_LISTING_REQUIRES_CURRENT_RUNTIME_AND_METADATA_UPDATE"
+    "disposition": "SUPERSEDE_WITH_REVIEWED_0_4_1_VERSION"
   },
   "currentVerifierCapabilities": {
     "doneStateContract": "donestate.verification-contract.v2",
@@ -59,22 +67,19 @@
   },
   "openAIProviderAction": {
     "target": "EXISTING_OPSTRUTH_PLUGIN_LISTING",
+    "newVersion": "0.4.1",
     "actionOrder": [
+      "MERGE_AND_DEPLOY_EXACT_0_4_1_RELEASE_SOURCE",
       "OPEN_EXISTING_PUBLISHER_RECORD",
-      "READ_CURRENT_PROVIDER_STATE_AND_VISIBLE_VERSION",
-      "UPDATE_THE_EXISTING_PRODUCT_NOT_CREATE_A_DUPLICATE",
+      "CREATE_NEW_VERSION_0_4_1_ON_EXISTING_PRODUCT",
       "SET_CANONICAL_METADATA_ORIGIN_TO_MCP_OPSTRUTH_IO",
-      "REFRESH_TOOL_AND_INPUT_SNAPSHOT_FROM_LIVE_CANONICAL_ENDPOINT",
-      "BIND_REVIEW_EVIDENCE_TO_DEPLOYED_RUNTIME_SOURCE_49107F",
-      "SUBMIT_OR_PUBLISH_THE_PROVIDER_SUPPORTED_UPDATE",
-      "RECORD_PROVIDER_VERSION_AND_REVIEW_ID",
-      "RUN_CLEAN_ACCOUNT_INSTALL_AND_ONE_REAL_TOOL_OUTCOME_AFTER_PROVIDER_PUBLICATION"
+      "SCAN_LIVE_CANONICAL_MCP_SERVER",
+      "REVIEW_THE_FROZEN_21_TOOL_AND_SKILL_SNAPSHOT",
+      "BIND_REVIEW_EVIDENCE_TO_EXACT_DEPLOYED_0_4_1_SOURCE",
+      "SUBMIT_0_4_1_FOR_REVIEW",
+      "PUBLISH_THE_APPROVED_0_4_1_VERSION",
+      "RUN_CLEAN_ACCOUNT_INSTALL_AND_ONE_REAL_TOOL_OUTCOME"
     ],
-    "versionRule": "DO_NOT_INVENT_A_NEW_VERSION_IN_REPOSITORY. Keep 0.4.0 only if the provider explicitly supports refreshing the current listing snapshot under that version. If a new version is required, use the provider-supported next-version flow and record the resulting version before claiming publication.",
-    "doNot": ["CREATE_DUPLICATE_OPSTRUTH_PRODUCT", "LEAVE_WORKERS_DEV_AS_PRIMARY_METADATA_ORIGIN"]
-  },
-  "providerReferences": {
-    "openAIApps": "https://help.openai.com/en/articles/11487775",
-    "openAIAppsSdk": "https://help.openai.com/en/articles/12515353-build-with-the-apps-sdk"
+    "doNot": ["CREATE_DUPLICATE_OPSTRUTH_PRODUCT", "LEAVE_WORKERS_DEV_AS_PRIMARY_METADATA_ORIGIN", "CLAIM_0_4_1_PUBLIC_BEFORE_PROVIDER_APPROVAL_AND_PUBLICATION"]
   }
 }
