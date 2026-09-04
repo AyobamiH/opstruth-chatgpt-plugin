@@ -44,13 +44,17 @@ This is the current live interoperability milestone. PR #115 remains open and un
 
 ## Contract anti-drift controls
 
-`contracts/donestate/manifest.json` pins the shared DoneState response/report/attestation schemas and verified/failed/uncertain/negative vectors by Git blob identity. `npm run validate:donestate-contract-lock` now recomputes every vendored blob identity during normal CI. The read-only `DoneState contract drift` workflow runs hourly and compares those locked identities with the corresponding artifacts on `AyobamiH/donestate@main`, plus the v2 contract version, response-schema path and historical-outcome invariant. It has `contents: read` only and does not create, retry, mutate, merge or verify DoneState runs.
+`contracts/donestate/manifest.json` pins the shared DoneState response/report/attestation schemas and verified/failed/uncertain/negative vectors by Git blob identity. `npm run validate:donestate-contract-lock` recomputes every vendored blob identity during normal CI. The read-only `DoneState contract drift` workflow runs hourly and compares those locked identities with the corresponding artifacts on `AyobamiH/donestate@main`, plus the v2 contract version, response-schema path and historical-outcome invariant. It has `contents: read` only and does not create, retry, mutate, merge or verify DoneState runs.
 
-## Maintainer and release gates
+## Maintainer and main-branch governance
 
 Maintainer bot v0 remains a deterministic, contents-read evidence source. It cannot approve, merge, deploy, release, or sign verification for its own change.
 
-`main` is currently unprotected, repository rulesets are not enforced, CODEOWNERS names only `@AyobamiH`, and no second trusted human reviewer is identified. Security, authentication, deployment, release, and evidence-contract changes require non-author human review before merge. A commit-bound tag and release must wait until the repaired deployed identity is reconciled to exact channel identities.
+`main` is currently unprotected. GitHub reports required status-check enforcement off and zero active repository rulesets, so provider activation remains **BLOCKED_PROVIDER_ACTION**. The repository now carries an activation-ready mechanical proposal that requires pull requests, the always-emitted `verify` and `review` GitHub Actions checks, strict target-branch freshness, resolved review conversations, deletion blocking, and non-fast-forward blocking with zero required human approvals. A second trusted human reviewer is a follow-on strengthening step that adds one independent approval later and may not weaken the mechanical baseline.
+
+`npm run validate:main-governance` fails if the checked-in proposal invents active provider state, silently adds a human approval before a reviewer exists, drops either required check, widens the target beyond `main`, or weakens deletion/non-fast-forward protection. CODEOWNERS still names only `@AyobamiH`, and the owner remains the only merge authority. Provider settings must be applied and independently read back before this document may claim protection is active.
+
+Security, authentication, deployment, release, and evidence-contract changes remain authority-sensitive. A commit-bound tag and release must wait until the repaired deployed identity is reconciled to exact channel identities.
 
 ## Deferred scope
 
