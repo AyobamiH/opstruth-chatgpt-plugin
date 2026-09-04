@@ -1,6 +1,6 @@
 # Current status
 
-As of 2026-09-01, OpsTruth `0.4.0` is publicly visible in the OpenAI Plugins Directory and deployed on its owned MCP domain. The currently deployed source remains commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`; the P0 repair stack on PR #20 is not production evidence until it reaches `main`, deploys, and passes fresh read-back.
+As of 2026-09-04, OpsTruth `0.4.0` remains publicly visible in the OpenAI Plugins Directory on its owned MCP domain. The directory-release baseline remains commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`; the independent DoneState verifier runtime has since advanced through the reviewed P0 stack to current `main` `eef00ca4f242cf99d6b39e8c37ae4b84970a86e4`, which is production evidence for the DoneState bridge but does not rewrite the older directory-release record.
 
 ## Verified production identity
 
@@ -15,7 +15,7 @@ As of 2026-09-01, OpsTruth `0.4.0` is publicly visible in the OpenAI Plugins Dir
 - authority mode: read-only public evidence
 - signer fingerprint: `sha256:09544c3ede70b832a114918bb439960004655faf9d36981e1402587af9429c86`
 
-The deployment workflow and public health read-back bind version `0.4.0`, 21 tools, Evidence Graph `1.0.0`, configured signing, and commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`. The Cloudflare provider control plane was not independently read during this reconciliation, so the active provider version remains an owner-side read-back gate.
+The directory-release deployment workflow and public health read-back bind version `0.4.0`, 21 tools, Evidence Graph `1.0.0`, configured signing, and commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`. The later DoneState-verifier production repair is separately bound below to exact source, CI, deployment, exact pull-request head and terminal DoneState outcome.
 
 ## Public channels
 
@@ -26,25 +26,35 @@ The deployment workflow and public health read-back bind version `0.4.0`, 21 too
 
 The Marketplace Action is not a release of this plugin repository. This repository currently has no GitHub tag, GitHub release, or GitHub deployment record.
 
-## Active P0 repair program
+## P0 verifier repair outcome
 
-The open carrier PR #20 now contains the reconciled false-evidence repairs plus the stacked verifier work that was reviewed separately in #23 and #25. Until #20 reaches `main`, those changes remain candidate source rather than deployed truth.
+The false-evidence repair stack is no longer merely a candidate. It reached `main`, deployed, and participated in a real production DoneState verification. The final repository-subject identity correction merged in PR #26 as `eef00ca4f242cf99d6b39e8c37ae4b84970a86e4`; exact-main CI `33808853938` passed and production deployment `33808853917` succeeded.
 
-The carrier includes capability-specific migration completeness, exact-head GitHub outcome classification, scoped graph verdicts, the internal-versus-independent deployment smoke regression, a verifier-owned GitHub App read lane restricted to `AyobamiH/donestate`, and the complete `donestate.verification-contract.v2` response envelope with pinned shared vectors.
+The deployed verifier uses short-lived installation credentials, authenticated exact-head Metadata/Contents/Checks/Commit-status reads, strict repository identity and scope checks, no anonymous or static-token success fallback, and the complete `donestate.verification-contract.v2` response envelope with pinned shared vectors.
 
 ## DoneState bridge state
 
-Historical DoneState run `631d8a08-d337-4bae-bd18-b55c31f48a8b` remains valid historical `VERIFIED` evidence. Historical run `b4242932-0bc1-4876-a202-634d9c12d72a` remains unproven and must not be rewritten or retroactively trusted.
+Historical DoneState run `631d8a08-d337-4bae-bd18-b55c31f48a8b` remains valid historical `VERIFIED` evidence. Historical run `b4242932-0bc1-4876-a202-634d9c12d72a` remains unproven and must not be rewritten or retroactively trusted. Later predecessor runs #105, #108, #110 and #112 likewise retain their recorded terminal ambiguity or capability-block outcomes.
 
-The candidate verifier lane uses short-lived installation credentials, authenticated exact-head Metadata/Contents/Checks/Commit-status reads, strict repository identity and scope checks, and no anonymous or static-token success fallback. The candidate bridge returns the strict `{ contractVersion, report, attestation }` response required by DoneState. Neither capability is recorded as production-ready until the carrier is independently reviewed, merged to `main`, the GitHub App is correctly installed/configured, the exact main commit deploys, and a new consequence-disabled sealed canary reaches terminal read-back.
+The fresh successor issue #114 produced exactly one durable run `c4a07fa6-90b2-4597-a4c6-eae66de5a3e8`, branch `donestate/c4a07fa6-90b2-4597-a4c6-eae66de5a3e8`, and open/unmerged DoneState PR #115 at exact head `41f1ae3b0fed670e64bd99f1bcb1aea9c9e7e869`. Exact-head DoneState CI run `33806832575` passed `core (22)`, `core (24)`, and `hosted-plugin`.
 
-DoneState PR #22 was owner-merged without public terminal verifier evidence. That owner action does not widen OpsTruth authority and does not verify the historical canary.
+The first OpsTruth response for that canary exposed a strict-schema defect: `report.subject.providerRepositoryId` was serialized as a string. DoneState rejected it rather than accepting partial or malformed evidence. PR #26 changed only that exact-commit evidence adapter to preserve GitHub's numeric repository identity and added a regression assertion. After `eef00ca4f242cf99d6b39e8c37ae4b84970a86e4` deployed, production OpsTruth returned the complete `{ contractVersion, report, attestation }` bundle for exact head `41f1ae3b0fed670e64bd99f1bcb1aea9c9e7e869`; the report decision was `verified`, and DoneState accepted it into terminal `VERIFIED`.
 
-## Maintainer and release gates
+This is the current live interoperability milestone. PR #115 remains open and unmerged evidence. No historical run is rewritten by the successful successor.
+
+## Contract anti-drift controls
+
+`contracts/donestate/manifest.json` pins the shared DoneState response/report/attestation schemas and verified/failed/uncertain/negative vectors by Git blob identity. `npm run validate:donestate-contract-lock` recomputes every vendored blob identity during normal CI. The read-only `DoneState contract drift` workflow runs hourly and compares those locked identities with the corresponding artifacts on `AyobamiH/donestate@main`, plus the v2 contract version, response-schema path and historical-outcome invariant. It has `contents: read` only and does not create, retry, mutate, merge or verify DoneState runs.
+
+## Maintainer and main-branch governance
 
 Maintainer bot v0 remains a deterministic, contents-read evidence source. It cannot approve, merge, deploy, release, or sign verification for its own change.
 
-`main` is currently unprotected, repository rulesets are not enforced, CODEOWNERS names only `@AyobamiH`, and no second trusted human reviewer is identified. Security, authentication, deployment, release, and evidence-contract changes require non-author human review before merge. A commit-bound tag and release must wait until the repaired deployed identity is reconciled to exact channel identities.
+`main` is currently unprotected. GitHub reports required status-check enforcement off and zero active repository rulesets, so provider activation remains **BLOCKED_PROVIDER_ACTION**. The repository now carries an activation-ready mechanical proposal that requires pull requests, the always-emitted `verify` and `review` GitHub Actions checks, strict target-branch freshness, resolved review conversations, deletion blocking, and non-fast-forward blocking with zero required human approvals. A second trusted human reviewer is a follow-on strengthening step that adds one independent approval later and may not weaken the mechanical baseline.
+
+`npm run validate:main-governance` fails if the checked-in proposal invents active provider state, silently adds a human approval before a reviewer exists, drops either required check, widens the target beyond `main`, or weakens deletion/non-fast-forward protection. CODEOWNERS still names only `@AyobamiH`, and the owner remains the only merge authority. Provider settings must be applied and independently read back before this document may claim protection is active.
+
+Security, authentication, deployment, release, and evidence-contract changes remain authority-sensitive. A commit-bound tag and release must wait until the repaired deployed identity is reconciled to exact channel identities.
 
 ## Deferred scope
 
@@ -54,6 +64,6 @@ Private-repository evidence brokerage, managed longitudinal storage, a verifier 
 
 - Production DoneState canary #114 reached OpsTruth v2 after its exact-head CI passed, and the deployed verifier returned HTTP 200.
 - DoneState correctly rejected the response because `report.subject.providerRepositoryId` was a string even though the shared verification-report schema requires an integer or null.
-- Root cause is isolated to the exact-commit GitHub verification evidence adapter: GitHub supplies a numeric repository ID, but OpsTruth converted it with `String(metadata.id)` before building the signed report.
-- This repair converts only the exact-commit verification evidence repository ID to `Number(metadata.id)` and adds a regression assertion that the value remains numeric. General repository-audit snapshot semantics are unchanged.
-- Completion remains unproven until this source revision passes the full repository check, is deployed, and a fresh DoneState canary reaches the complete sealed-handoff -> OpsTruth v2 -> DoneState `VERIFIED` chain.
+- Root cause was isolated to the exact-commit GitHub verification evidence adapter: GitHub supplies a numeric repository ID, but OpsTruth converted it with `String(metadata.id)` before building the signed report.
+- The repair converts only the exact-commit verification evidence repository ID to `Number(metadata.id)` and adds a regression assertion that the value remains numeric. General repository-audit snapshot semantics are unchanged.
+- The repaired source passed CI, deployed, returned a strict complete v2 response for PR #115 head `41f1ae3b0fed670e64bd99f1bcb1aea9c9e7e869`, and DoneState reached terminal `VERIFIED`; the earlier malformed response remains part of the failure history rather than being reclassified.

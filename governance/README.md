@@ -1,44 +1,56 @@
 # Proposed main governance
 
-Status: `BLOCKED`
+Status: `BLOCKED_PROVIDER_ACTION`
 
-This directory is a review-only proposal for OpsTruth `main`. It does not change GitHub repository settings. On 2026-09-01, the authenticated GitHub branch settings page reported `main` as `UNPROTECTED`. No active ruleset exists in this repository evidence.
+This directory contains the reviewed activation payload for OpsTruth `main`. It does not change GitHub repository settings by itself. On 2026-09-04, provider read-back still reported `main` as `UNPROTECTED`, required status-check enforcement off, and zero active rulesets.
 
-Activation is blocked until the owner names one trusted human reviewer other than the owner and grants only the access needed for that person to approve pull requests. The reviewer field remains `null` because no person has been named. Do not replace it with a guessed identity.
+The design is deliberately staged so a missing second trusted human reviewer does not leave `main` mechanically unprotected.
 
-## Ownership and merge authority
+## Stage 1: mechanical baseline
 
-`@AyobamiH` is the current and only truthful code owner. The proposed `update` rule and sole user bypass actor keep merge authority with the repository owner. The bypass mode is `pull_request`, so it provides an owner-only emergency path with a pull-request audit trail. It does not permit direct pushes, force pushes, or branch deletion.
+The activation-ready baseline requires:
 
-Normal changes require one approval from someone other than the last pusher, resolved review threads, and both required hosted checks. An emergency bypass is for restoration or incident containment only. The owner should identify the incident in the pull request, state which rule is bypassed, and open a follow-up review item. The proposal does not weaken the deletion or non-fast-forward rules for emergencies.
+- every `main` update through a pull request;
+- exact hosted checks `verify` and `review` on the current pull-request head;
+- strict freshness against the target branch;
+- resolved review conversations;
+- deletion blocked;
+- non-fast-forward updates blocked;
+- zero required human approvals until a real independent reviewer exists.
 
-Code-owner review is not proposed as a required rule while the owner is the only truthful entry. Requiring it now would deadlock owner-authored pull requests because an author cannot approve their own change. The independent human approval rule becomes usable only after the activation blocker is resolved.
+`@AyobamiH` remains the current truthful code owner and only merge authority. One owner emergency bypass is retained in `always` mode so repository recovery does not require deleting or disabling the ruleset. It is emergency authority, not a normal direct-push path.
+
+## Stage 2: independent human review
+
+After a trusted human other than the owner is named and the qualifying provider access model is accepted, strengthen the active ruleset to require one independent approval. This stage may only add constraints. It must not remove the pull-request requirement, required checks, freshness, deletion blocking, or non-fast-forward blocking.
+
+The reviewer field remains `null` until a real person is named. Automated OpsTruth, DoneState, GitHub Actions, bot, or agent output does not count as independent human approval.
 
 ## Exact hosted check inventory
 
-| Required context | Workflow | Job | Pull request trigger | Path filter | Job condition | Hosted sample |
-| --- | --- | --- | --- | --- | --- | --- |
-| `verify` | `CI` | `verify` | yes | none | none | PR #23, run `33484341570`, job `99780846732`, success |
-| `review` | `OpsTruth maintainer review` | `review` | yes | none | none | PR #23, run `33484341539`, job `99780847006`, success |
+| Required context | Workflow | Job | Pull request trigger | Path filter | Job condition |
+| --- | --- | --- | --- | --- | --- |
+| `verify` | `CI` | `verify` | yes | none | none |
+| `review` | `OpsTruth maintainer review` | `review` | yes | none | none |
 
-The candidate removes the draft-only job condition from `review`, so GitHub creates that job for every configured pull-request activity. Neither required workflow uses `paths` or `paths-ignore` filters. The Cloudflare `deploy` job is not required because it runs after selected pushes to `main` or by manual dispatch and uses path filters.
+Both required contexts are emitted by GitHub Actions on configured pull-request activity. The Cloudflare `deploy` job is excluded because it is not an always-emitted pull-request check.
 
-GitHub commit skip directives can suppress an entire `push` or `pull_request` workflow. They must not be used on pull requests targeting `main`. If a contributor uses one, the safe recovery is a new reviewable commit without a skip directive; required checks must never be marked successful manually.
+GitHub commit skip directives can suppress an entire workflow. They must not be used on pull requests targeting `main`. The safe recovery is a new reviewable commit without a skip directive; required checks must never be marked successful manually.
 
-## Activation procedure
+## Provider activation procedure
 
-The owner must complete these steps before changing the proposed ruleset from `disabled` to `active`:
+Repository implementation is ready. Provider activation remains `BLOCKED_PROVIDER_ACTION` until an authenticated owner settings write and independent read-back occur.
 
-1. Name and verify a second trusted human reviewer.
-2. Grant that reviewer only the repository access required for pull-request approval.
-3. Reverify that GitHub user ID `47716486` resolves to owner `@AyobamiH` before applying the bypass actor payload.
-4. Replace the `null` reviewer in `main-ruleset.proposed.json`, set the blocker to satisfied, and review the updated proposal in a pull request.
-5. Confirm fresh pull-request runs emit exact contexts `verify` and `review` on the same head commit.
-6. Apply the reviewed GitHub ruleset payload through an owner-controlled repository setting change.
-7. Re-read provider settings and record separate evidence that enforcement is active.
+1. Reverify GitHub user ID `47716486` resolves to owner `@AyobamiH` before applying the emergency bypass actor.
+2. Confirm a fresh pull request emits `verify` and `review` on the same current head.
+3. Apply `githubRuleset` from `main-ruleset.proposed.json`, changing only `enforcement` from `disabled` to `active`.
+4. Do not add another target, bypass actor, approval, or required check in that same provider action.
+5. Re-read provider settings and record the ruleset ID, active enforcement, effective `main` rules, and timestamp.
+6. Use a harmless test pull request to prove the normal PR/check path and destructive-ref blocking.
+7. Only after that read-back may repository truth change from `UNPROTECTED` and `BLOCKED_PROVIDER_ACTION` to active protection.
 
-Until all seven steps complete, the only supported state is `BLOCKED` and `UNPROTECTED`.
+The second trusted human reviewer is a follow-on strengthening gate, not a prerequisite to Stage 1.
 
 ## Release and channel separation
 
-This proposal does not deploy, publish, release, merge, or change channel state. It records the observed product identity as OpsTruth `0.4.0`, source `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`, with the ChatGPT directory state `PUBLISHED`. Governance review evidence is not deployment or publication evidence.
+This proposal does not deploy, publish, release, merge, or change channel state. It preserves the observed directory identity OpsTruth `0.4.0`, source baseline `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`, and ChatGPT directory state `PUBLISHED`. Governance evidence is not deployment or publication evidence.
