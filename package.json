@@ -11,18 +11,17 @@
     "validate:contracts": "node scripts/validate-contracts.mjs",
     "validate:vectors": "node scripts/generate-contract-vectors.mjs --check && node scripts/verify-vectors-standalone.mjs",
     "validate:donestate-contract-lock": "node scripts/check-donestate-contract-drift.mjs",
+    "validate:main-governance": "node scripts/check-main-governance-proposal.mjs",
     "validate:plugin": "node scripts/validate-plugin.mjs",
     "validate:evals": "node scripts/validate-evals.mjs",
     "smoke:production": "node scripts/smoke-production.mjs",
     "maintainer:review": "node scripts/maintainer-review.mjs",
     "docs:check": "node scripts/check-documentation-closure.mjs",
-    "check": "npm run lint && npm run check:boundaries && npm test && npm run validate:contracts && npm run validate:vectors && npm run validate:donestate-contract-lock && npm run validate:plugin && npm run validate:evals && npm run docs:check",
+    "check": "npm run lint && npm run check:boundaries && npm test && npm run validate:contracts && npm run validate:vectors && npm run validate:donestate-contract-lock && npm run validate:main-governance && npm run validate:plugin && npm run validate:evals && npm run docs:check",
     "dev": "npx --yes wrangler@4.127.0 dev",
     "deploy": "npx --yes wrangler@4.127.0 deploy",
     "analytics": "node scripts/query-analytics.mjs"
   },
-  "engines": {
-    "node": ">=20"
-  },
+  "engines": {"node": ">=20"},
   "license": "MIT"
 }
