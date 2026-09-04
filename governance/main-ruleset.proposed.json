@@ -1,36 +1,31 @@
 {
   "schema": "opstruth.main-governance-proposal",
   "schemaVersion": "2.0.0",
-  "proposalState": "BLOCKED_PROVIDER_ACTION",
+  "proposalState": "ACTIVE",
   "repository": {
     "name": "AyobamiH/opstruth-chatgpt-plugin",
     "repositoryId": 1345997124,
     "defaultBranch": "main",
-    "baseCommit": "eef00ca4f242cf99d6b39e8c37ae4b84970a86e4"
+    "baseCommit": "7cc308895cbbe06856cb4a3c80ff243a58eeb132"
   },
   "providerObservation": {
     "observedOn": "2026-09-04",
-    "source": "GitHub branch and ruleset API read-back",
-    "mainProtection": "UNPROTECTED",
-    "requiredStatusEnforcement": "OFF",
-    "activeRulesets": 0,
-    "rulesetId": null
+    "source": "GitHub branch and ruleset API read-back plus enforcement probe PR #29",
+    "mainProtection": "PROTECTED",
+    "requiredStatusEnforcement": "ON",
+    "activeRulesets": 1,
+    "rulesetId": 22247265
   },
   "activation": {
-    "permitted": false,
+    "permitted": true,
     "desiredEnforcement": "active",
     "artifactEnforcement": "disabled",
-    "blockers": [
-      {
-        "id": "provider_ruleset_write",
-        "state": "UNSATISFIED",
-        "requirement": "An authenticated repository-owner settings action must apply the exact mechanical ruleset, followed by independent provider read-back and a test pull request."
-      }
-    ]
+    "activatedAt": "2026-09-04T05:48:38.670+01:00",
+    "blockers": []
   },
   "stages": {
     "mechanicalBaseline": {
-      "state": "READY_FOR_PROVIDER_ACTIVATION",
+      "state": "ACTIVE",
       "requiredApprovals": 0,
       "requiresSecondHumanReviewer": false
     },
@@ -41,8 +36,12 @@
     }
   },
   "ownership": {
-    "codeOwners": ["@AyobamiH"],
-    "mergeAuthority": ["@AyobamiH"],
+    "codeOwners": [
+      "@AyobamiH"
+    ],
+    "mergeAuthority": [
+      "@AyobamiH"
+    ],
     "independentReviewer": {
       "reviewer": null,
       "state": "UNNAMED",
@@ -50,7 +49,9 @@
       "mustBeHuman": true
     },
     "emergencyBypass": {
-      "actors": ["@AyobamiH"],
+      "actors": [
+        "@AyobamiH"
+      ],
       "mode": "always",
       "directPush": "EMERGENCY_ONLY",
       "forcePush": false,
@@ -106,18 +107,35 @@
     "target": "branch",
     "enforcement": "disabled",
     "bypass_actors": [
-      {"actor_id": 47716486, "actor_type": "User", "bypass_mode": "always"}
+      {
+        "actor_id": 47716486,
+        "actor_type": "User",
+        "bypass_mode": "always"
+      }
     ],
     "conditions": {
-      "ref_name": {"include": ["refs/heads/main"], "exclude": []}
+      "ref_name": {
+        "include": [
+          "refs/heads/main"
+        ],
+        "exclude": []
+      }
     },
     "rules": [
-      {"type": "deletion"},
-      {"type": "non_fast_forward"},
+      {
+        "type": "deletion"
+      },
+      {
+        "type": "non_fast_forward"
+      },
       {
         "type": "pull_request",
         "parameters": {
-          "allowed_merge_methods": ["merge", "squash", "rebase"],
+          "allowed_merge_methods": [
+            "merge",
+            "squash",
+            "rebase"
+          ],
           "dismiss_stale_reviews_on_push": false,
           "require_code_owner_review": false,
           "require_last_push_approval": false,
@@ -130,8 +148,14 @@
         "parameters": {
           "do_not_enforce_on_create": false,
           "required_status_checks": [
-            {"context": "verify", "integration_id": 15368},
-            {"context": "review", "integration_id": 15368}
+            {
+              "context": "verify",
+              "integration_id": 15368
+            },
+            {
+              "context": "review",
+              "integration_id": 15368
+            }
           ],
           "strict_required_status_checks_policy": true
         }
@@ -139,10 +163,28 @@
     ]
   },
   "activationReadBack": {
-    "state": "NOT_ATTEMPTED",
-    "observedAt": null,
-    "rulesetId": null,
-    "providerEnforcement": null,
-    "effectiveBranchRules": []
+    "state": "VERIFIED",
+    "observedAt": "2026-09-04T05:54:20+01:00",
+    "rulesetId": 22247265,
+    "providerEnforcement": "active",
+    "effectiveBranchRules": [
+      "refs/heads/main only",
+      "pull request required",
+      "verify required via GitHub Actions integration 15368",
+      "review required via GitHub Actions integration 15368",
+      "strict target-branch freshness",
+      "resolved review conversations",
+      "deletion blocked",
+      "non-fast-forward blocked",
+      "zero required approvals",
+      "single owner emergency bypass"
+    ],
+    "enforcementProbe": {
+      "pullRequest": 29,
+      "head": "6ec09aed203b8beb4b0358c064f29f5f1690a79b",
+      "verifyRun": 33838447356,
+      "reviewRun": 33838447326,
+      "mergeCommit": "7cc308895cbbe06856cb4a3c80ff243a58eeb132"
+    }
   }
 }
