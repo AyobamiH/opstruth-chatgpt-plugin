@@ -50,11 +50,13 @@ This is the current live interoperability milestone. PR #115 remains open and un
 
 Maintainer bot v0 remains a deterministic, contents-read evidence source. It cannot approve, merge, deploy, release, or sign verification for its own change.
 
-`main` is currently unprotected. GitHub reports required status-check enforcement off and zero active repository rulesets, so provider activation remains **BLOCKED_PROVIDER_ACTION**. The repository now carries an activation-ready mechanical proposal that requires pull requests, the always-emitted `verify` and `review` GitHub Actions checks, strict target-branch freshness, resolved review conversations, deletion blocking, and non-fast-forward blocking with zero required human approvals. A second trusted human reviewer is a follow-on strengthening step that adds one independent approval later and may not weaken the mechanical baseline.
+`main` is now **PROTECTED** by active GitHub repository ruleset **22247265**, `OpsTruth main mechanical governance`, targeting only `refs/heads/main`. Stage 1 requires pull requests, always-emitted `verify` and `review` checks pinned to GitHub Actions integration `15368`, strict target freshness, resolved review conversations, deletion blocking, and non-fast-forward blocking with zero required human approvals and one owner emergency bypass.
 
-`npm run validate:main-governance` fails if the checked-in proposal invents active provider state, silently adds a human approval before a reviewer exists, drops either required check, widens the target beyond `main`, or weakens deletion/non-fast-forward protection. CODEOWNERS still names only `@AyobamiH`, and the owner remains the only merge authority. Provider settings must be applied and independently read back before this document may claim protection is active.
+Provider enforcement was proven with PR #29 at exact head `6ec09aed203b8beb4b0358c064f29f5f1690a79b`. CI `33838447356` passed `verify` and maintainer review `33838447326` passed `review`; only after both cleared did the PR merge normally as `7cc308895cbbe06856cb4a3c80ff243a58eeb132`. Issue #28 is closed completed. `npm run validate:main-governance` now fails if provider protection, ruleset identity, required checks, main-only targeting, destructive-ref blocking, or the zero-approval Stage 1 baseline drifts.
 
-Security, authentication, deployment, release, and evidence-contract changes remain authority-sensitive. A commit-bound tag and release must wait until the repaired deployed identity is reconciled to exact channel identities.
+A second trusted human reviewer remains a follow-on Stage 2 strengthening step and may not weaken Stage 1. CODEOWNERS still names only `@AyobamiH`, and the owner remains the only merge authority.
+
+Security, authentication, deployment, release, and evidence-contract changes remain authority-sensitive.
 
 ## Deferred scope
 
