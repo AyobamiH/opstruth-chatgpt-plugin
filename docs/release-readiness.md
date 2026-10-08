@@ -43,7 +43,7 @@ OpsTruth binds public repository, commit, CI, optional runtime and caller-suppli
 - Adversarial tamper, signer, subject, expiry, scope and contradiction tests pass.
 - Wrangler produces a deployable Worker bundle.
 - Pull-request CI and deterministic maintainer review pass on the exact head commit.
-- Non-author human review is recorded for authentication, architecture, contracts, workflows and authority-sensitive changes.
+- Non-author human review is recorded for authentication, architecture, contracts, workflows and authority-sensitive changes, unless the documented solo-maintainer release exception below is explicitly authorised by the human owner.
 - Post-merge CI and Cloudflare deployment pass on the exact main commit.
 - Deployment fails before its first write when the three required GitHub App Worker secret names are absent.
 - `/health` reports version `0.4.0`, 21 tools, Evidence Graph `1.0.0`, the exact deployed commit and configured selected-repository GitHub App verification.
@@ -59,9 +59,9 @@ Repository merge, Cloudflare deployment, OpenAI review, visible directory public
 
 - Merge the reconciled P0 carrier to `main`, then deploy the exact main commit and pass the internal-versus-independent production regression.
 - Create and independently review the verifier-owned GitHub App, install it only on `AyobamiH/donestate`, and configure its three Cloudflare Worker secrets before the authenticated canary.
-- Obtain non-author architecture/security review for the authority-sensitive authentication, contract and deployment changes.
+- Obtain non-author architecture/security review for authority-sensitive changes, or record the bounded human-owner release exception below where it applies.
 - Run a fresh consequence-disabled DoneState canary only after exact-commit production read-back succeeds.
-- Identify a second trusted human reviewer, then protect `main` with exact PR checks and non-author human approval for protected changes.
+- Preserve exact required PR checks and normal merge enforcement. A second trusted human reviewer remains the preferred route; an eligible solo-maintainer release must use the explicit owner exception below.
 - Create a commit-bound plugin tag and release only after the repaired deployed identity is reconciled.
 - Run the controlled five-mode product-value comparison before making superiority claims.
 - Reconcile the OpenAI listing metadata from the compatibility origin to the reviewed canonical origin when the provider workflow permits it.
@@ -103,12 +103,55 @@ allows only the explicitly named ten false-to-true annotation corrections,
 asserts their exact read-only/non-destructive annotations, and retains the
 original canonical digest check for every other contract field. This is an
 intentional disclosure correction, not a claim of byte-identical annotations.
-Non-author human review remains required before merge and deployment. The
-production scan finding stays open until the reviewed correction is deployed
-and a fresh native scan confirms it.
+The review and release requirements above, including the bounded solo-maintainer
+exception when explicitly authorised by the human owner, apply before merge and
+deployment. The production scan finding stays open until the reviewed correction
+is deployed and a fresh native scan confirms it.
 
 The package now uses the documented websiteURL, supportURL, privacyPolicyURL
 and termsOfServiceURL fields and an explicit capabilities array; validation
 rejects the obsolete field names. The published skills-only package identity
 is preserved in source. The separately prepared initial MCP draft has its own
 opstruth-verification identity, and is not yet submitted or published.
+
+
+## Bounded solo-maintainer release exception
+
+An unavailable second person must not be replaced by another account controlled
+by the author, a bot approval or a fabricated review. The human owner may
+explicitly authorise an owner-led release for a bounded maintenance change after
+a documented exact-commit technical review. Record this as owner-directed release
+acceptance, never as independent human review.
+
+This exception is eligible only when the patch adds no target-system writes,
+credential or signing authority, authentication scope, private-data storage, new
+network destination, or workflow/deployment authority. Changes outside that
+boundary retain the normal non-author architecture/security review requirement.
+
+An eligible release must retain all of the following:
+
+- A recorded human-owner direction, rationale, exact PR head and base, review
+  findings and unresolved risks. An automated review is technical evidence only.
+- Passing exact-head boundary, contract/migration, adversarial and packaging
+  checks and both required GitHub `verify` and `review` checks.
+- Normal protected PR merge with an exact-head guard; no administrative bypass,
+  required-check removal, force push or self-approval.
+- Passing post-merge checks, exact-main deployment identity, required production
+  route checks and a documented rollback target. Failed or unobservable checks
+  keep the corresponding release milestone incomplete.
+- Separate native provider scans, live reviewer cases, actual walkthrough and
+  clean-account acceptance before their respective submission/publication claims.
+
+For PR #37, the owner has directed progress through this solo-maintainer route
+on 9 October 2026 after confirming that both accounts are theirs and no second
+reviewer is available. The bounded scope is canonical MCP packaging, truthful
+external-read annotations, analytics minimisation/privacy signals, policy copy
+and compatibility evidence. The technical review covered head
+`67a247d3965c907fe1ec74b5e3482e43625f3645` against base
+`65b6c619423858711a3d10748c6337cea78c6388`; the documentation amendment must
+receive fresh exact-head checks before merge. No independent human sign-off is
+asserted. Original published listing and native draft identities are preserved.
+
+The maintainer bot remains read-only and cannot approve its own changes or alter
+protected policy autonomously. This owner-authorised exception does not grant
+the bot, public MCP service or inspected target any additional authority.
