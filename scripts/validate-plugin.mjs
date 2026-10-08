@@ -6,6 +6,14 @@ const root = new URL("..", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("../.codex-plugin/plugin.json", import.meta.url), "utf8"));
 const provenance = JSON.parse(await readFile(new URL("../provenance/sources.json", import.meta.url), "utf8"));
 const errors = [];
+if (manifest.mcpServers !== "./.mcp.json") errors.push("bundled MCP configuration reference is missing");
+const mcp = await readFile(new URL("../.mcp.json", import.meta.url), "utf8").then(JSON.parse).catch(() => null);
+if (!mcp || Object.keys(mcp).join(",") !== "mcpServers"
+  || Object.keys(mcp.mcpServers || {}).join(",") !== "opstruth"
+  || Object.keys(mcp.mcpServers?.opstruth || {}).join(",") !== "url"
+  || mcp.mcpServers?.opstruth?.url !== "https://mcp.opstruth.io/mcp") {
+  errors.push("bundle must declare exactly the canonical remote MCP URL without credentials or local commands");
+}
 
 if (manifest.name !== "opstruth") errors.push("plugin name must remain opstruth");
 if (manifest.version !== "0.4.1") errors.push("plugin version mismatch");
@@ -13,6 +21,20 @@ if (manifest.author?.name !== "AYOBAMI JOHN HAASTRUP") errors.push("verified pub
 if (manifest.skills !== "./skills/") errors.push("skills path must be relative");
 if (manifest.interface?.logo !== "./assets/logo-mark.png") errors.push("interface logo must reference the square product mark");
 if (manifest.interface?.composerIcon !== "./assets/logo-mark.png") errors.push("composer icon must reference the square product mark");
+const requiredListingURLs = {
+  websiteURL: "https://opstruth.io",
+  supportURL: "https://mcp.opstruth.io/support",
+  privacyPolicyURL: "https://mcp.opstruth.io/privacy",
+  termsOfServiceURL: "https://mcp.opstruth.io/terms",
+};
+for (const [field, expected] of Object.entries(requiredListingURLs)) {
+  if (manifest.interface?.[field] !== expected) errors.push(`interface.${field} must reference the canonical public URL`);
+}
+if (!Array.isArray(manifest.interface?.capabilities)) errors.push("interface.capabilities must be an array");
+for (const legacy of ["website", "support", "privacyPolicy", "termsOfService"]) {
+  if (legacy in manifest.interface) errors.push(`unsupported legacy listing field: ${legacy}`);
+}
+
 if (!Array.isArray(provenance.sources) || provenance.sources.length < 6) errors.push("provenance must cover all source systems");
 
 const logo = await stat(new URL(`../${manifest.interface?.logo || "missing"}`, import.meta.url)).catch(() => null);
@@ -35,7 +57,22 @@ for (const name of skillNames) {
 const toolNames = TOOL_DEFINITIONS.map((tool) => tool.name);
 if (new Set(toolNames).size !== toolNames.length) errors.push("tool names must be unique");
 if (TOOL_DEFINITIONS.length !== 21) errors.push(`expected 21 tools, found ${TOOL_DEFINITIONS.length}`);
-const openWorldTools = new Set(["opstruth_probe_deployment", "opstruth_snapshot_evidence", "opstruth_verify_execution_result", "opstruth_attest_donestate_handoff"]);
+const openWorldTools = new Set([
+  "opstruth_inspect_repository",
+  "opstruth_audit_repository",
+  "opstruth_trace_routes",
+  "opstruth_audit_environment",
+  "opstruth_audit_secrets",
+  "opstruth_review_api_contracts",
+  "opstruth_review_migrations",
+  "opstruth_check_github_handoff",
+  "opstruth_check_deployment",
+  "opstruth_prepare_sandbox_verification",
+  "opstruth_probe_deployment",
+  "opstruth_snapshot_evidence",
+  "opstruth_verify_execution_result",
+  "opstruth_attest_donestate_handoff",
+]);
 for (const tool of TOOL_DEFINITIONS) {
   if (tool.annotations?.readOnlyHint !== true) errors.push(`${tool.name}: must be read-only`);
   if (tool.annotations?.destructiveHint !== false) errors.push(`${tool.name}: destructive annotation mismatch`);

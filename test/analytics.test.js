@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyticsPoint, classifyClient, feedbackPoint, recordFeedbackEvent, recordToolEvent, summarizeToolResult } from "../src/analytics.js";
+import { analyticsPoint, classifyClient, feedbackPoint, recordFeedbackEvent, recordToolEvent, summarizeToolResult, classifyToolError, shouldRecordAnalytics } from "../src/analytics.js";
 
 test("analytics stores bounded aggregate dimensions only", () => {
   const request = new Request("https://example.test/mcp", { headers: { "user-agent": "ChatGPT/1.0" } });
@@ -10,7 +10,7 @@ test("analytics stores bounded aggregate dimensions only", () => {
     verdict: "insufficient_evidence", counts: { evidence: 4, warnings: 2, failures: 0, notVerified: 3 }, ciObserved: true, signedEvidence: true,
   });
   assert.deepEqual(point.indexes, ["opstruth_audit_repository"]);
-  assert.deepEqual(point.blobs, ["tool_call", "opstruth_audit_repository", "success", "chatgpt", "0.4.1", "insufficient_evidence", "ci_observed", "deployment_not_probed", "evidence_signed"]);
+  assert.deepEqual(point.blobs, ["tool_call", "opstruth_audit_repository", "success", "chatgpt", "0.4.1", "insufficient_evidence", "ci_observed", "deployment_not_probed", "evidence_signed", "none"]);
   assert.deepEqual(point.doubles, [42, 200, 4, 2, 0, 3]);
 });
 
@@ -57,4 +57,36 @@ test("analytics writes are best effort and use waitUntil", async () => {
   await Promise.all(pending);
   assert.equal(writes.length, 1);
   assert.equal(writes[0].blobs[1], "opstruth_probe_deployment");
+});
+
+test("caller supplied labels cannot enter aggregate dimensions", () => {
+  const point = analyticsPoint({ tool: "customer_123", outcome: "private_case", client: "secret_id", errorCategory: "customer_error_text" });
+  assert.deepEqual(point.indexes, ["unknown"]);
+  assert.equal(point.blobs[1], "unknown");
+  assert.equal(point.blobs[2], "unknown");
+  assert.equal(point.blobs[3], "mcp");
+  assert.equal(JSON.stringify(point).includes("customer"), false);
+  for (const error of [new Error("tool_input_invalid:private/customer"), new Error("opstruth_signing_identity_required"), new Error("tool_not_found"), new Error("private upstream body"), "secret"]) {
+    const category = classifyToolError(error);
+    assert.ok(["input_invalid", "signing_unavailable", "tool_not_found", "other"].includes(category));
+    assert.equal(JSON.stringify(analyticsPoint({ tool: "opstruth_audit_repository", outcome: "error", errorCategory: category })).includes("private"), false);
+  }
+  assert.equal(analyticsPoint({ outcome: "error", errorCategory: "private" }).blobs[9], "other");
+});
+
+test("privacy signals suppress tool and feedback writes without scheduling work", async () => {
+  for (const headers of [{ dnt: "1" }, { "sec-gpc": "1" }, { dnt: "0", "sec-gpc": "1" }]) {
+    const request = new Request("https://example.test/mcp", { headers });
+    const writes = [];
+    const pending = [];
+    const env = { OPSTRUTH_ANALYTICS: { writeDataPoint: (point) => writes.push(point) } };
+    const ctx = { waitUntil: (promise) => pending.push(promise) };
+    assert.equal(shouldRecordAnalytics(request), false);
+    recordToolEvent(env, ctx, request, { tool: "opstruth_audit_repository", outcome: "success" });
+    assert.equal(recordFeedbackEvent(env, ctx, { reason: "useful", surface: "mcp" }, request), false);
+    await Promise.all(pending);
+    assert.deepEqual(writes, []);
+    assert.deepEqual(pending, []);
+  }
+  assert.equal(shouldRecordAnalytics(new Request("https://example.test/mcp", { headers: { dnt: "0" } })), true);
 });

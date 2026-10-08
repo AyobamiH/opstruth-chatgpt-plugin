@@ -1,13 +1,24 @@
 import { PLUGIN_VERSION } from "./version.js";
+import { TOOL_DEFINITIONS } from "./tools.js";
 
-const SAFE_VALUE = /^[a-z0-9_:-]{1,96}$/;
+const TOOL_NAMES = new Set(TOOL_DEFINITIONS.map((tool) => tool.name));
+const OUTCOMES = new Set(["success", "error"]);
+const CLIENTS = new Set(["chatgpt", "codex", "mcp"]);
+const ERROR_CATEGORIES = new Set(["none", "tool_not_found", "input_invalid", "signing_unavailable", "other"]);
 const VERDICTS = new Set(["verified", "partial", "contradicted", "unproven", "ready_for_live_validation", "insufficient_evidence", "not_ready", "blocked", "none"]);
 const FEEDBACK_REASONS = new Set(["useful", "missed_evidence", "false_warning", "unclear_result", "incorrect_binding"]);
 const FEEDBACK_SURFACES = new Set(["chatgpt", "codex", "mcp", "website"]);
 
-function safeValue(value, fallback) {
-  const candidate = String(value || "").toLowerCase();
-  return SAFE_VALUE.test(candidate) ? candidate : fallback;
+export function shouldRecordAnalytics(request) {
+  return request?.headers?.get?.("dnt") !== "1" && request?.headers?.get?.("sec-gpc") !== "1";
+}
+
+export function classifyToolError(error) {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "tool_not_found" || message === "tool_handler_not_found") return "tool_not_found";
+  if (message.startsWith("tool_input_invalid:") || message === "tool_input_exceeds_1_mib") return "input_invalid";
+  if (message === "opstruth_signing_identity_required") return "signing_unavailable";
+  return "other";
 }
 
 /**
@@ -35,19 +46,20 @@ function normalVerdict(value) {
   return VERDICTS.has(normalized) ? normalized : "none";
 }
 
-export function analyticsPoint({ tool, outcome, status, latencyMs, client, verdict, counts = {}, ciObserved = false, deploymentProbed = false, signedEvidence = false }) {
+export function analyticsPoint({ tool, outcome, status, latencyMs, client, verdict, counts = {}, ciObserved = false, deploymentProbed = false, signedEvidence = false, errorCategory = "none" }) {
   return {
-    indexes: [safeValue(tool, "unknown")],
+    indexes: [TOOL_NAMES.has(tool) ? tool : "unknown"],
     blobs: [
       "tool_call",
-      safeValue(tool, "unknown"),
-      safeValue(outcome, "unknown"),
-      safeValue(client, "mcp"),
+      TOOL_NAMES.has(tool) ? tool : "unknown",
+      OUTCOMES.has(outcome) ? outcome : "unknown",
+      CLIENTS.has(client) ? client : "mcp",
       PLUGIN_VERSION,
       normalVerdict(verdict),
       ciObserved ? "ci_observed" : "ci_not_observed",
       deploymentProbed ? "deployment_probed" : "deployment_not_probed",
       signedEvidence ? "evidence_signed" : "evidence_unsigned",
+      outcome !== "error" ? "none" : ERROR_CATEGORIES.has(errorCategory) && errorCategory !== "none" ? errorCategory : "other",
     ],
     doubles: [
       Number.isFinite(latencyMs) ? Math.max(0, Math.round(latencyMs)) : 0,
@@ -94,6 +106,7 @@ export function feedbackPoint({ reason, surface }) {
  * configured in wrangler.jsonc.
  */
 export function recordToolEvent(env, ctx, request, event) {
+  if (!shouldRecordAnalytics(request)) return;
   const binding = env?.OPSTRUTH_ANALYTICS;
   if (!binding || typeof binding.writeDataPoint !== "function") return;
   const write = Promise.resolve().then(() => binding.writeDataPoint(analyticsPoint({
@@ -103,10 +116,11 @@ export function recordToolEvent(env, ctx, request, event) {
   if (typeof ctx?.waitUntil === "function") ctx.waitUntil(write);
 }
 
-export function recordFeedbackEvent(env, ctx, event) {
+export function recordFeedbackEvent(env, ctx, event, request) {
+  const point = feedbackPoint(event);
+  if (!shouldRecordAnalytics(request)) return false;
   const binding = env?.OPSTRUTH_ANALYTICS;
   if (!binding || typeof binding.writeDataPoint !== "function") return false;
-  const point = feedbackPoint(event);
   const write = Promise.resolve().then(() => binding.writeDataPoint(point)).catch(() => undefined);
   if (typeof ctx?.waitUntil === "function") ctx.waitUntil(write);
   return true;
