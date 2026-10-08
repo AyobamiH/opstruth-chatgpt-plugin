@@ -65,3 +65,26 @@ Repository merge, Cloudflare deployment, OpenAI review, visible directory public
 - Create a commit-bound plugin tag and release only after the repaired deployed identity is reconciled.
 - Run the controlled five-mode product-value comparison before making superiority claims.
 - Reconcile the OpenAI listing metadata from the compatibility origin to the reviewed canonical origin when the provider workflow permits it.
+
+## Owner-only analytics reporting
+
+Run `npm run analytics` with `CLOUDFLARE_ACCOUNT_ID` and a separate
+`CLOUDFLARE_ANALYTICS_READ_TOKEN` that has Account Analytics:Read. Keep the
+credential in the owner environment; never pass it to a public MCP tool or
+commit it. `OPSTRUTH_ANALYTICS_DAYS` defaults to 7 and is bounded to 1–90 days.
+
+The helper sends raw SQL to the Analytics Engine SQL endpoint and reads its
+`data` array. Counts and averages use `_sample_interval` weighting so sampled
+rows are not presented as raw event totals. `transport_responses` counts HTTP
+2xx responses; use the separate `outcome` dimension for tool success or error.
+An MCP tool error can return HTTP 200.
+
+Calls include owner and test traffic. Coarse client-family labels do not
+establish unique people, installations, paid customers or a joined website-to-
+plugin journey. Existing aggregate records contain no error reason or test-
+traffic marker, so these reports cannot attribute historical errors to a
+specific cause or separate controlled tests from customer calls. An empty
+feedback report means no recorded feedback for that window, not satisfaction.
+
+Public-site GA4 measures consented visits and catalogue clicks separately; a
+catalogue click is not proof of installation or a completed tool call.
