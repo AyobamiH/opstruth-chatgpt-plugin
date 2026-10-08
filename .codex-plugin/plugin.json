@@ -23,5 +23,6 @@
     "privacyPolicy": "https://mcp.opstruth.io/privacy",
     "termsOfService": "https://mcp.opstruth.io/terms",
     "support": "https://mcp.opstruth.io/support"
-  }
+  },
+  "mcpServers": "./.mcp.json"
 }

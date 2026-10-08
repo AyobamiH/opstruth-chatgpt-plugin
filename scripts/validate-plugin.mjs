@@ -6,6 +6,14 @@ const root = new URL("..", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("../.codex-plugin/plugin.json", import.meta.url), "utf8"));
 const provenance = JSON.parse(await readFile(new URL("../provenance/sources.json", import.meta.url), "utf8"));
 const errors = [];
+if (manifest.mcpServers !== "./.mcp.json") errors.push("bundled MCP configuration reference is missing");
+const mcp = await readFile(new URL("../.mcp.json", import.meta.url), "utf8").then(JSON.parse).catch(() => null);
+if (!mcp || Object.keys(mcp).join(",") !== "mcpServers"
+  || Object.keys(mcp.mcpServers || {}).join(",") !== "opstruth"
+  || Object.keys(mcp.mcpServers?.opstruth || {}).join(",") !== "url"
+  || mcp.mcpServers?.opstruth?.url !== "https://mcp.opstruth.io/mcp") {
+  errors.push("bundle must declare exactly the canonical remote MCP URL without credentials or local commands");
+}
 
 if (manifest.name !== "opstruth") errors.push("plugin name must remain opstruth");
 if (manifest.version !== "0.4.1") errors.push("plugin version mismatch");

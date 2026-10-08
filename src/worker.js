@@ -2,7 +2,7 @@ import { callTool, TOOL_DEFINITIONS } from "./tools.js";
 import { evidenceResource, EVIDENCE_UI_URI } from "./ui.js";
 import { asErrorMessage, htmlResponse, jsonResponse, signingMetadata } from "./utils.js";
 import { landingPage, privacyPage, supportPage, termsPage } from "./pages.js";
-import { recordFeedbackEvent, recordToolEvent, summarizeToolResult } from "./analytics.js";
+import { classifyToolError, shouldRecordAnalytics, recordFeedbackEvent, recordToolEvent, summarizeToolResult } from "./analytics.js";
 import { PLUGIN_VERSION } from "./version.js";
 import { githubAppHealth } from "./github-app.js";
 
@@ -48,7 +48,7 @@ async function handleRpc(payload, request, env, ctx, options = {}) {
       recordToolEvent(env, ctx, request, { tool: params.name, outcome: "success", status: 200, latencyMs: Date.now() - started, ...summarizeToolResult(toolResult) });
       return response;
     } catch (error) {
-      recordToolEvent(env, ctx, request, { tool: params.name, outcome: "error", status: 200, latencyMs: Date.now() - started });
+      recordToolEvent(env, ctx, request, { tool: params.name, outcome: "error", status: 200, latencyMs: Date.now() - started, errorCategory: classifyToolError(error) });
       return rpcResult(id, {
         isError: true,
         content: [{ type: "text", text: `OpsTruth could not complete the read-only check: ${asErrorMessage(error)}` }],
@@ -108,7 +108,8 @@ async function fetchHandler(request, env, ctx) {
       return jsonResponse({ error: "feedback_invalid" }, 400);
     }
     try {
-      const recorded = recordFeedbackEvent(env, ctx, { reason: payload.reason, surface: payload.surface });
+      const recorded = recordFeedbackEvent(env, ctx, { reason: payload.reason, surface: payload.surface }, request);
+      if (!shouldRecordAnalytics(request)) return jsonResponse({ status: "not_recorded", retainedFields: [] }, 202);
       return jsonResponse({ status: recorded ? "accepted" : "not_configured", retainedFields: recorded ? ["reason", "surface", "version"] : [] }, recorded ? 202 : 503);
     } catch (error) {
       return jsonResponse({ error: asErrorMessage(error) }, 400);
