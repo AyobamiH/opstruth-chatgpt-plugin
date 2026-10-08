@@ -19,10 +19,11 @@
     "longDescription": "OpsTruth inspects public GitHub repositories, reads current public CI evidence, probes user-supplied HTTPS health endpoints, binds observations into portable signed Evidence Graphs, compares state snapshots, independently verifies execution receipts, and signs sealed DoneState v2 verification handoffs without changing target projects.",
     "developerName": "AYOBAMI JOHN HAASTRUP",
     "category": "Developer Tools",
-    "website": "https://opstruth.io",
-    "privacyPolicy": "https://mcp.opstruth.io/privacy",
-    "termsOfService": "https://mcp.opstruth.io/terms",
-    "support": "https://mcp.opstruth.io/support"
+    "websiteURL": "https://opstruth.io",
+    "supportURL": "https://mcp.opstruth.io/support",
+    "privacyPolicyURL": "https://mcp.opstruth.io/privacy",
+    "termsOfServiceURL": "https://mcp.opstruth.io/terms",
+    "capabilities": []
   },
   "mcpServers": "./.mcp.json"
 }

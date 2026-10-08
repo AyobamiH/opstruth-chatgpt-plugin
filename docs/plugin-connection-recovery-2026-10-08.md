@@ -22,3 +22,26 @@ The candidate suppresses tool and feedback telemetry for DNT: 1 / Sec-GPC: 1. La
 Historical records lack this category and cannot be backfilled or reclassified. Owner/test calls without privacy suppression remain mixed with usage. Neither these aggregate calls nor website listing clicks establish installations or unique users.
 
 The source tests exercise unknown labels, fixed error categories, both suppression headers, MCP HTTP-200 error semantics and unrecorded feedback acknowledgement. Source/CI success is separate from deployment and live directory acceptance.
+
+## Verified initial MCP draft progress
+
+A separate unpublished OpsTruth Verification draft was created on 8 October
+2026 using the supported initial MCP ZIP flow. Its package name is
+`opstruth-verification`; the source compatibility package remains `opstruth`.
+The existing published OpsTruth skills listing was preserved.
+
+Draft: https://platform.openai.com/plugins/manage/plugin_asdk_app_6ac7fd26659081918b2c8145fbb424e5
+
+The platform accepted the corrected required listing URLs, all six skill scans
+passed, domain verification passed, and the anonymous canonical MCP connection
+was configured. Native discovery found all 21 tools. Ten public GitHub readers
+were flagged because openWorldHint was false despite external network reads.
+The candidate fixes those annotations with read-only/non-destructive flags
+preserved and a bounded compatibility migration; deployment and native rescan
+remain pending recorded non-author review.
+
+The required five positive and three negative review-case definitions were
+imported. Their successful live execution and the required real walkthrough
+recording have not been completed. A privacy-policy finding remains to be
+reconciled against the reviewed live server. No review submission, approval,
+customer installation, customer tool outcome or publication is claimed.

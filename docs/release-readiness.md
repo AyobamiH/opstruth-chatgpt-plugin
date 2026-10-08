@@ -88,3 +88,27 @@ feedback report means no recorded feedback for that window, not satisfaction.
 
 Public-site GA4 measures consented visits and catalogue clicks separately; a
 catalogue click is not proof of installation or a completed tool call.
+
+## Initial MCP draft annotation correction — 8 October 2026
+
+The OpenAI scan of the separate OpsTruth Verification draft discovered all 21
+tools and flagged ten public-GitHub readers whose `openWorldHint` was false.
+The candidate declares those ten external reads as open-world while retaining
+`readOnlyHint: true` and `destructiveHint: false`. It adds no fetch destination,
+credential, write operation or automatic execution. Purely local planning,
+rendering and supplied-receipt checks remain closed-world.
+
+The immutable 0.3.1 compatibility fixture is retained. The migration comparison
+allows only the explicitly named ten false-to-true annotation corrections,
+asserts their exact read-only/non-destructive annotations, and retains the
+original canonical digest check for every other contract field. This is an
+intentional disclosure correction, not a claim of byte-identical annotations.
+Non-author human review remains required before merge and deployment. The
+production scan finding stays open until the reviewed correction is deployed
+and a fresh native scan confirms it.
+
+The package now uses the documented websiteURL, supportURL, privacyPolicyURL
+and termsOfServiceURL fields and an explicit capabilities array; validation
+rejects the obsolete field names. The published skills-only package identity
+is preserved in source. The separately prepared initial MCP draft has its own
+opstruth-verification identity, and is not yet submitted or published.

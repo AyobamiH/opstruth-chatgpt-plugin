@@ -38,6 +38,24 @@ const REPOSITORY_INPUT = {
 
 const REPORT_OUTPUT = { type: "object", additionalProperties: true };
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
+// External reads still interact with independently controlled systems.
+// Local planning, rendering and supplied-receipt checks remain closed-world.
+const OPEN_WORLD_TOOLS = new Set([
+  "opstruth_inspect_repository",
+  "opstruth_audit_repository",
+  "opstruth_trace_routes",
+  "opstruth_audit_environment",
+  "opstruth_audit_secrets",
+  "opstruth_review_api_contracts",
+  "opstruth_review_migrations",
+  "opstruth_check_github_handoff",
+  "opstruth_check_deployment",
+  "opstruth_prepare_sandbox_verification",
+  "opstruth_probe_deployment",
+  "opstruth_snapshot_evidence",
+  "opstruth_verify_execution_result",
+  "opstruth_attest_donestate_handoff",
+]);
 const TRUSTED_SIGNERS = {
   type: "array",
   maxItems: 50,
@@ -52,7 +70,7 @@ function tool(name, title, description, inputSchema = REPOSITORY_INPUT, extra = 
     description,
     inputSchema,
     outputSchema: REPORT_OUTPUT,
-    annotations: READ_ONLY,
+    annotations: { ...READ_ONLY, openWorldHint: OPEN_WORLD_TOOLS.has(name) },
     ...extra,
   };
 }
