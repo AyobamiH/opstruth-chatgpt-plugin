@@ -45,3 +45,8 @@ imported. Their successful live execution and the required real walkthrough
 recording have not been completed. A privacy-policy finding remains to be
 reconciled against the reviewed live server. No review submission, approval,
 customer installation, customer tool outcome or publication is claimed.
+
+
+## Privacy disclosure completion
+
+The candidate policy now identifies Cloudflare hosting/Analytics Engine and GitHub public-source requests, scopes excluded data to application analytics, states the Analytics Engine three-month event retention and the five-minute public GitHub cache lifetime, and describes DNT/GPC as a direct-MCP-client control. The Analytics Engine retention was checked against https://developers.cloudflare.com/analytics/analytics-engine/limits/ on 8 October 2026; the cache lifetime is declared in src/github.js. No collection, credential, target authority or storage mechanism is expanded by these wording corrections. This remains candidate policy text until reviewed and deployed; the native privacy finding is not declared resolved.
