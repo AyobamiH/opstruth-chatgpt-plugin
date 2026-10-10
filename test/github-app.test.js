@@ -293,3 +293,27 @@ test("GitHub App failures never expose private keys, JWTs, tokens, IDs, or provi
   }
   assert.equal(failure?.code, "GITHUB_APP_REQUEST_FAILED");
 });
+
+
+test("private broker checks immutable identity and visibility while retaining read-only permissions", async () => {
+  const metadata = { id: 424242, full_name: REPOSITORY, private: true, visibility: "private" };
+  const fetch = async (request) => {
+    assert.equal(request.redirect, "error");
+    assert.ok(request.signal);
+    if (new URL(request.url).pathname.endsWith("/access_tokens")) {
+      return Response.json(tokenResponse({ repositories: [metadata] }));
+    }
+    return Response.json(metadata);
+  };
+  const client = createGithubAppClient(appEnv(), REPOSITORY, clientOptions(fetch, { expectedVisibility: "private" }));
+  client.assertSelectedRepository(await client.json(`/repos/${REPOSITORY}`));
+  assert.equal(client.authority.scope, "selected_private_repository");
+  const publicClient = createGithubAppClient(appEnv(), REPOSITORY, clientOptions(fetch));
+  await assert.rejects(publicClient.json(`/repos/${REPOSITORY}`));
+  for (const repositories of [[{ ...metadata, id: 555 }], [{ ...metadata, private: false, visibility: "public" }]]) {
+    const wrong = createGithubAppClient(appEnv(), REPOSITORY, clientOptions(async () => Response.json(tokenResponse({ repositories })), { expectedVisibility: "private" }));
+    await assert.rejects(wrong.json(`/repos/${REPOSITORY}`));
+  }
+  const broad = createGithubAppClient(appEnv(), REPOSITORY, clientOptions(async () => Response.json(tokenResponse({ repositories: [metadata], permissions: { contents: "write" } })), { expectedVisibility: "private" }));
+  await assert.rejects(broad.json(`/repos/${REPOSITORY}`));
+});

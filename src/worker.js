@@ -1,3 +1,4 @@
+import { privateVerificationResponse } from "./private-verification.js";
 import { callTool, TOOL_DEFINITIONS } from "./tools.js";
 import { evidenceResource, EVIDENCE_UI_URI } from "./ui.js";
 import { asErrorMessage, htmlResponse, jsonResponse, signingMetadata } from "./utils.js";
@@ -94,6 +95,7 @@ async function mcpResponse(request, env, ctx) {
 
 async function fetchHandler(request, env, ctx) {
   const url = new URL(request.url);
+  if (url.pathname === "/internal/donestate-private-verification") return privateVerificationResponse(request, env, ctx);
   if (url.pathname === "/mcp") return mcpResponse(request, env, ctx);
   if (url.pathname === "/feedback") {
     if (request.method !== "POST") return jsonResponse({ error: "method_not_allowed", allowed: ["POST"] }, 405, { allow: "POST" });
