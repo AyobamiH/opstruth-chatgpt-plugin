@@ -44,6 +44,29 @@ function clientOptions(fetch, extra = {}) {
   return { fetch, now: () => NOW, sleep: async () => {}, ...extra };
 }
 
+test("default GitHub transport preserves the Worker global fetch receiver for public and private access", async () => {
+  const previous = globalThis.fetch;
+  let calls = 0;
+  try {
+    for (const visibility of ["public", "private"]) {
+      const selected = { id: 424242, full_name: REPOSITORY, private: visibility === "private", visibility };
+      globalThis.fetch = async function (request) {
+        assert.equal(this, globalThis, "Worker fetch requires the global receiver");
+        calls += 1;
+        if (new URL(request.url).pathname === "/app/installations/987654/access_tokens") {
+          return Response.json(tokenResponse({ repositories: [selected] }));
+        }
+        assert.equal(request.headers.get("authorization"), `Bearer ${INSTALLATION_TOKEN}`);
+        return Response.json(selected);
+      };
+      const client = createGithubAppClient(appEnv(), REPOSITORY, { now: () => NOW, expectedVisibility: visibility });
+      const repository = await client.json("/repos/Example/project");
+      client.assertSelectedRepository(repository);
+    }
+    assert.equal(calls, 4);
+  } finally { globalThis.fetch = previous; }
+});
+
 test("GitHub App JWT is an RS256 credential bounded to ten minutes", async () => {
   for (const type of ["pkcs8", "pkcs1"]) {
     const env = appEnv({

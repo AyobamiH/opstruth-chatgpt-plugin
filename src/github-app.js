@@ -303,7 +303,7 @@ function apiHeaders(authorization) {
 
 export function createGithubAppClient(env = {}, requestedRepository, options = {}) {
   const configuration = readConfiguration(env, requestedRepository, options.expectedVisibility ?? "public");
-  const fetchImpl = options.fetch || globalThis.fetch;
+  const fetchImpl = options.fetch || (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
   const now = options.now || (() => Date.now());
   const sleep = options.sleep || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
   if (typeof fetchImpl !== "function") throw githubAppError("GITHUB_APP_REQUEST_FAILED", "GitHub verification fetch is unavailable");
