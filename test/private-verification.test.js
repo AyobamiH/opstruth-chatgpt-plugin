@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { generateKeyPairSync } from "node:crypto";
 import { canonicalJson } from "../src/canonical.js";
-import { privateVerificationResponse } from "../src/private-verification.js";
+import { privateVerificationFailureCode, privateVerificationResponse } from "../src/private-verification.js";
 import { callTool } from "../src/tools.js";
 import worker from "../src/worker.js";
 import { sha256 } from "../src/utils.js";
@@ -198,4 +198,33 @@ test("public MCP cannot reach private credentials even for a valid private hando
   globalThis.fetch = async () => assert.fail("public tool cannot mint private installation tokens");
   try { await assert.rejects(callTool("opstruth_attest_donestate_handoff", { handoff: await handoff() }, env(), {})); }
   finally { globalThis.fetch = previous; }
+});
+
+test("private failure classification retains only reviewed fixed codes", () => {
+  const sensitive = "private-owner/private-repo secret_key_value";
+  assert.equal(privateVerificationFailureCode({ code: "GITHUB_APP_SCOPE_INVALID", message: sensitive }), "GITHUB_APP_SCOPE_INVALID");
+  assert.equal(privateVerificationFailureCode({ message: "opstruth_signing_identity_required" }), "opstruth_signing_identity_required");
+  assert.equal(privateVerificationFailureCode({ name: "DataError", message: sensitive }), "runtime_DataError");
+  for (const error of [undefined, sensitive, { code: sensitive }, { code: "GITHUB_APP_UNREVIEWED_PRIVATE_VALUE", message: sensitive }, { message: sensitive }, { name: sensitive }]) {
+    assert.equal(privateVerificationFailureCode(error), "private_verification_failed");
+  }
+});
+
+test("private failure logs exclude provider bodies, credentials and repository metadata", async () => {
+  const previousFetch = globalThis.fetch;
+  const previousError = console.error;
+  const sensitive = "private-owner/private-repo raw-secret-bearer-value";
+  const logs = [];
+  globalThis.fetch = async () => { throw new Error(sensitive); };
+  console.error = (value) => logs.push(value);
+  try {
+    const result = await privateVerificationResponse(request({ accountSubjectSha256: PRINCIPAL, handoff: await handoff() }), env());
+    assert.equal(result.status, 503);
+    assert.deepEqual(await result.json(), { error: "private_verification_unavailable" });
+    assert.deepEqual(logs.map(JSON.parse), [{ message: "private_verification_failed", failureCode: "GITHUB_APP_REQUEST_FAILED" }]);
+    assert.ok(!JSON.stringify(logs).includes(sensitive));
+    assert.ok(!JSON.stringify(logs).includes("Example/project"));
+    assert.ok(!JSON.stringify(logs).includes(TOKEN));
+    assert.ok(!JSON.stringify(logs).includes(key));
+  } finally { globalThis.fetch = previousFetch; console.error = previousError; }
 });
