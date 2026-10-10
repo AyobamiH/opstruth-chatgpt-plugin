@@ -706,13 +706,13 @@ async function fetchVerificationFile(client, repository, headSha, entry) {
   return decodeContentsFile(payload, entry);
 }
 
-export async function loadCommitVerificationEvidence({ repository: input, baseSha, headSha, paths: requestedPaths = [] }, env = {}, ctx = {}) {
+export async function loadCommitVerificationEvidence({ repository: input, baseSha, headSha, paths: requestedPaths = [] }, env = {}, ctx = {}, options = {}) {
   const repository = parseRepository(input);
   assertCommitSha(baseSha, "base_sha");
   assertCommitSha(headSha, "head_sha");
   const paths = [...new Set(requestedPaths.map(assertVerificationPath))].sort();
   if (paths.length > 20) throw new Error("verification_path_limit_exceeded");
-  const client = createGithubAppClient(env, repository.fullName);
+  const client = createGithubAppClient(env, repository.fullName, { expectedVisibility: options.privateRepository === true ? "private" : "public" });
   const repositoryPrefix = `/repos/${encodeURIComponent(repository.owner)}/${encodeURIComponent(repository.repo)}`;
   const metadata = await client.json(repositoryPrefix);
   client.assertSelectedRepository(metadata);

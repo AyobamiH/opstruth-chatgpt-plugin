@@ -40,7 +40,8 @@ function hasPrivateKeyEnvelope(value) {
     && /-----END (?:RSA )?PRIVATE KEY-----/.test(value);
 }
 
-function readConfiguration(env = {}, requestedRepository) {
+function readConfiguration(env = {}, requestedRepository, expectedVisibility = "public") {
+  if (!["public", "private"].includes(expectedVisibility)) throw githubAppError("GITHUB_APP_CONFIGURATION_INVALID", "GitHub App verification configuration is invalid");
   const appId = text(env.OPSTRUTH_GITHUB_APP_ID);
   const installationId = text(env.OPSTRUTH_GITHUB_APP_INSTALLATION_ID);
   const privateKeyPem = text(env.OPSTRUTH_GITHUB_APP_PRIVATE_KEY_PEM);
@@ -63,7 +64,7 @@ function readConfiguration(env = {}, requestedRepository) {
   if (allowedRepository.comparison !== requested.comparison) {
     throw githubAppError("GITHUB_APP_REPOSITORY_NOT_ALLOWED", "GitHub App verification access is not allowed for this repository");
   }
-  return { appId, installationId, privateKeyPem, allowedRepository, allowedRepositoryId: selectedRepositoryId };
+  return { appId, installationId, privateKeyPem, allowedRepository, allowedRepositoryId: selectedRepositoryId, expectedVisibility };
 }
 
 export function githubAppHealth(env = {}) {
@@ -255,7 +256,7 @@ function responseError(response) {
   return githubAppError("GITHUB_APP_REQUEST_FAILED", `GitHub verification request failed with status ${response.status}`);
 }
 
-function validateInstallationToken(payload, nowMs, allowedRepository, allowedRepositoryId) {
+function validateInstallationToken(payload, nowMs, allowedRepository, allowedRepositoryId, expectedVisibility) {
   const token = typeof payload?.token === "string" ? payload.token : "";
   const expiresAtMs = typeof payload?.expires_at === "string" ? Date.parse(payload.expires_at) : Number.NaN;
   if (!/^[A-Za-z0-9._-]+$/.test(token) || token.length > MAX_INSTALLATION_TOKEN_LENGTH || !Number.isFinite(expiresAtMs)
@@ -272,7 +273,7 @@ function validateInstallationToken(payload, nowMs, allowedRepository, allowedRep
     || String(selectedRepository.id) !== allowedRepositoryId
     || typeof selectedRepository.full_name !== "string"
     || selectedRepository.full_name.toLowerCase() !== allowedRepository.comparison
-    || selectedRepository.private !== false || selectedRepository.visibility !== "public") {
+    || selectedRepository.private !== (expectedVisibility === "private") || selectedRepository.visibility !== expectedVisibility) {
     throw githubAppError("GITHUB_APP_SCOPE_INVALID", "GitHub App installation token scope was not least privilege");
   }
   for (const [permission, access] of Object.entries(payload.permissions)) {
@@ -301,7 +302,7 @@ function apiHeaders(authorization) {
 }
 
 export function createGithubAppClient(env = {}, requestedRepository, options = {}) {
-  const configuration = readConfiguration(env, requestedRepository);
+  const configuration = readConfiguration(env, requestedRepository, options.expectedVisibility ?? "public");
   const fetchImpl = options.fetch || globalThis.fetch;
   const now = options.now || (() => Date.now());
   const sleep = options.sleep || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
@@ -336,6 +337,8 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
     });
     const response = await boundedFetch(() => new Request(url, {
       method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(30_000),
       headers: { ...apiHeaders(`Bearer ${jwt}`), "content-type": "application/json" },
       body,
     }));
@@ -349,6 +352,7 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
       now(),
       configuration.allowedRepository,
       configuration.allowedRepositoryId,
+      configuration.expectedVisibility,
     );
     if (observedRepositoryId && installationToken.repositoryId !== observedRepositoryId) {
       installationToken = null;
@@ -370,6 +374,8 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
     for (let authAttempt = 0; authAttempt < 2; authAttempt += 1) {
       const current = await validInstallationToken(authAttempt > 0);
       const response = await boundedFetch(() => new Request(`${GITHUB_API_ORIGIN}${path}`, {
+        redirect: "error",
+        signal: AbortSignal.timeout(30_000),
         headers: apiHeaders(`Bearer ${current.token}`),
       }));
       if (response.status === 401) {
@@ -393,7 +399,7 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
   }
 
   function assertSelectedRepository(metadata) {
-    if (!installationToken || metadata?.private !== false || metadata?.visibility !== "public"
+    if (!installationToken || metadata?.private !== (configuration.expectedVisibility === "private") || metadata?.visibility !== configuration.expectedVisibility
       || typeof metadata?.full_name !== "string"
       || metadata.full_name.toLowerCase() !== configuration.allowedRepository.comparison
       || String(metadata?.id || "") !== configuration.allowedRepositoryId
@@ -406,7 +412,7 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
   return {
     json,
     assertSelectedRepository,
-    authority: Object.freeze({ mode: "github_app_installation", scope: "selected_public_repository" }),
+    authority: Object.freeze({ mode: "github_app_installation", scope: configuration.expectedVisibility === "private" ? "selected_private_repository" : "selected_public_repository" }),
   };
 }
 

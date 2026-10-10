@@ -262,7 +262,7 @@ export async function verifyDoneStateHandoff(handoff, env = {}, ctx = {}, option
     baseSha: handoff.subject.baseHeadSha,
     headSha: handoff.subject.headSha,
     paths: contentPaths,
-  }, env, ctx);
+  }, env, ctx, { privateRepository: options.privateRepository === true });
   const subjectErrors = [];
   if (!evidence.subject.commitAvailable) subjectErrors.push("exact_commit_unavailable");
   else if (evidence.subject.observedHeadSha !== handoff.subject.headSha) subjectErrors.push("exact_commit_mismatch");
