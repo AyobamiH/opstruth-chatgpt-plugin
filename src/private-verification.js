@@ -4,6 +4,22 @@ import { sha256 } from "./utils.js";
 const MAX_BODY_BYTES = 256 * 1024;
 const MAX_POLICY_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 const POLICY_KEYS = ["accountSubjectSha256", "repository", "repositoryId", "installationId", "issuedAt", "expiresAt"];
+const PRIVATE_FAILURE_CODES = new Set([
+  "GITHUB_APP_AUTH_FAILED", "GITHUB_APP_CONFIGURATION_INVALID", "GITHUB_APP_NOT_CONFIGURED",
+  "GITHUB_APP_NOT_FOUND", "GITHUB_APP_PERMISSION_DENIED", "GITHUB_APP_RATE_LIMIT",
+  "GITHUB_APP_REPOSITORY_NOT_ALLOWED", "GITHUB_APP_REQUEST_FAILED", "GITHUB_APP_REQUEST_INVALID",
+  "GITHUB_APP_RESPONSE_INVALID", "GITHUB_APP_SCOPE_INVALID", "GITHUB_APP_TOKEN_INVALID",
+  "donestate_handoff_digest_mismatch", "opstruth_signing_identity_required", "signing_key_invalid", "expired_policy",
+]);
+
+export function privateVerificationFailureCode(error) {
+  if (PRIVATE_FAILURE_CODES.has(error?.code)) return error.code;
+  if (PRIVATE_FAILURE_CODES.has(error?.message)) return error.message;
+  if (["DataError", "OperationError", "InvalidAccessError", "NotSupportedError", "TimeoutError", "AbortError"].includes(error?.name)) {
+    return `runtime_${error.name}`;
+  }
+  return "private_verification_failed";
+}
 
 function record(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -105,5 +121,8 @@ export async function privateVerificationResponse(request, env = {}, ctx = {}, o
     const result = await verifyDoneStateHandoff(body.handoff, privateEnv, ctx, { privateRepository: true });
     if (Date.parse(policy.expiresAt) <= Date.now()) throw new Error("expired_policy");
     return response(result, 200);
-  } catch { return response({ error: "private_verification_unavailable" }, 503); }
+  } catch (error) {
+    console.error(JSON.stringify({ message: "private_verification_failed", failureCode: privateVerificationFailureCode(error) }));
+    return response({ error: "private_verification_unavailable" }, 503);
+  }
 }
