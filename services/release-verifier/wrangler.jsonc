@@ -1,0 +1,22 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "opstruth-release-verify",
+  "account_id": "6ddcbcb8474f1a7e460b2f0aabec0e2f",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-17",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ROLE": "release-verifier",
+    "ENABLED": "false",
+    "TRUSTED_SOURCE_SHA": "0000000000000000000000000000000000000000",
+    "AUDIENCE": "https://opstruth-release-verify.woeinvests.workers.dev",
+    "TARGET_SUBJECT_JSON": ""
+  },
+  "observability": {
+    "enabled": false
+  }
+}

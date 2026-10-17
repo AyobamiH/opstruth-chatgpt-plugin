@@ -1,0 +1,9 @@
+{
+  "schema": "opstruth.release-verifier-trust.v1",
+  "signer": {
+    "publicKeyPem": "",
+    "fingerprint": ""
+  },
+  "custody": "cloudflare-encrypted-worker-secret",
+  "scope": "independent public read-only exact GitHub release canary"
+}

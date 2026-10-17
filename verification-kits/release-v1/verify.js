@@ -59,10 +59,10 @@ function decodeSignature(value) {
 async function checkProvenance(value, subject, packageSha, trustedFingerprints, observedAt) {
   exact(value, ["schema", "subjectDigest", "packageSha256", "issuer", "issuedAt", "signature"], "provenance");
   exact(value.signature, ["algorithm", "publicKeyPem", "signerFingerprint", "signatureBase64"], "provenance_signature");
-  // Exclude the provenance digest from its own signed manifest binding.
+  // Exclude the provenance asset ID and digest from its own signed manifest binding.
   // The complete downloaded signed manifest is independently bound by the
-  // subject.provenanceDigest check, avoiding a cryptographic hash cycle.
-  const { provenanceDigest, ...immutableSubjectWithoutProvenanceHash } = subject;
+  // subject.provenanceDigest and asset ID check, avoiding a construction-time hash/ID cycle.
+  const { provenanceDigest, provenanceAssetId, ...immutableSubjectWithoutProvenanceHash } = subject;
   demand(value.schema === "opstruth.release-v1.provenance.v1" &&
     value.subjectDigest === await sha256(stableJson(immutableSubjectWithoutProvenanceHash)) &&
     value.packageSha256 === packageSha && typeof value.issuer === "string" &&
