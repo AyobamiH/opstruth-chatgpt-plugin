@@ -167,7 +167,7 @@ test("handoff cannot be replayed for another GitHub workflow run, DoneState run,
 test("handed-off trust must be independent from AgentProof approval and receipt signer",async()=>{
   const f=await fixture();
   f.env.TRUSTED_DONESTATE_HANDOFF_FINGERPRINT=ap.fingerprint;
-  await assert.rejects(verifyFixture(f),/release_trust:handoff_signer_untrusted/);
+  await assert.rejects(verifyFixture(f),/role_separation_missing/);
 });
 test("receipt alteration or false approval cannot be rescued by a trusted AgentProof receipt signer",async()=>{
   const f=await fixture();
@@ -214,6 +214,19 @@ test("foreign source SHA, actor, ref or protected workflow are denied",()=>{
     sha:"f".repeat(40),repository_id:"8",actor_id:"8",workflow_ref:"other",
     sub:"repo:legacy",event_name:"push",
   }))assert.throws(()=>validateClaims({...c,[name]:value},f),/workload_rejected/);
+});
+test("all five authority and evidence signer pins must be separate",async()=>{
+  const f=await fixture();
+  for(const [name,value] of [
+    ["TRUSTED_PROVENANCE_SIGNER_FINGERPRINT",f.env.TRUSTED_AGENTPROOF_SIGNER_FINGERPRINT],
+    ["TRUSTED_PROVENANCE_SIGNER_FINGERPRINT",f.env.SIGNER_FINGERPRINT],
+    ["TRUSTED_DONESTATE_HANDOFF_FINGERPRINT",f.env.TRUSTED_PROVENANCE_SIGNER_FINGERPRINT],
+    ["TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT",f.env.TRUSTED_AGENTPROOF_SIGNER_FINGERPRINT],
+  ]){
+    const e={...f.env,[name]:value};
+    await assert.rejects(evaluate(f.body,e,stamp,()=>f.reader,githubRunId),
+      /role_separation_missing/);
+  }
 });
 test("public read-only adapter performs only GitHub GETs with manual redirects",async t=>{
   const f=await fixture(),urls=[];

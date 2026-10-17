@@ -30,6 +30,14 @@ function trust(env){
     DIGEST.test(env.TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT)&&
     DIGEST.test(env.TRUSTED_DONESTATE_HANDOFF_FINGERPRINT)&&
     DIGEST.test(env.TRUSTED_PROVENANCE_SIGNER_FINGERPRINT),"trust_not_configured",503);
+  // Cryptographically valid signatures alone do not establish independent
+  // evidence if the same signer is reused across proposer/approval/receipt,
+  // provenance and verification. Enforce distinct, externally pinned keys.
+  const rolePins=[env.SIGNER_FINGERPRINT,env.TRUSTED_AGENTPROOF_SIGNER_FINGERPRINT,
+    env.TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT,
+    env.TRUSTED_DONESTATE_HANDOFF_FINGERPRINT,
+    env.TRUSTED_PROVENANCE_SIGNER_FINGERPRINT];
+  demand(new Set(rolePins).size===rolePins.length,"role_separation_missing",503);
   let subject;
   try{subject=JSON.parse(env.TARGET_SUBJECT_JSON);}catch{throw new Denied("target_unconfigured",503);}
   demand(subject&&subject.schema==="opstruth.release-v1.subject.v1"&&
