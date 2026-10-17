@@ -39,11 +39,11 @@
     },
     {
       "repository": "https://github.com/AyobamiH/agentproof",
-      "commit": "9d35b7d3d38e",
-      "version": "0.1.0-rc.5",
+      "commit": "2ed24b95ec90f36d52132cc3f98fc9d937ade4da",
+      "version": "0.1.0-rc.6 published; release.v1 source-only candidate",
       "license": "Apache-2.0",
-      "role": "AgentProof signed receipt v2 compatibility and signed-evidence trust separation",
-      "integration": "independent protocol verifier",
+      "role": "AgentProof independently verified repository-patch receipt v2 plus separate candidate release.v1 subject, approval and receipt; no released release.v1 permission",
+      "integration": "independent read-only source-only release byte/provenance verification kit; production tool not activated",
       "modifiedUpstream": false
     },
     {
