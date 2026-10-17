@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test cases/*.check.mjs",
     "check": "npm test && wrangler deploy --config wrangler.jsonc --dry-run"
   },
   "dependencies": {
