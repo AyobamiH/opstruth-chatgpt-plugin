@@ -1,13 +1,13 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { createPrivateKey, createPublicKey, sign as signEd, verify as verifyEd, createHash } from "node:crypto";
-import { sha256, stableJson } from "../../../src/utils.js";
+import { createPrivateKey, createPublicKey, sign as signEd, createHash } from "node:crypto";
+import { stableJson } from "../../../src/utils.js";
+import { validateReleaseReceipt, validateRunHandoff } from "./trust.mjs";
 import { verifyReleaseV1Bytes } from "../../../verification-kits/release-v1/verify.js";
 import { PublicReleaseReader } from "./github-reader.mjs";
 
 const ISSUER="https://token.actions.githubusercontent.com";
 const JWKS=createRemoteJWKSet(new URL(ISSUER+"/.well-known/jwks"),
   {timeoutDuration:5000,cacheMaxAge:300000});
-const RECEIPT_DOMAIN="agentproof.signed-receipt.v2.release\0";
 const DECISION_DOMAIN="opstruth.release-v1-verification.v1\0";
 const CANARY="AyobamiH/agentproof-release-canary";
 const SUBJECT="repo:AyobamiH@47716486/agentproof-release-canary@1423718326:environment:agentproof-release-canary";
@@ -27,6 +27,8 @@ function trust(env){
   demand(env.ENABLED==="true"&&REF.test(env.TRUSTED_SOURCE_SHA)&&!/^0+$/.test(env.TRUSTED_SOURCE_SHA),
     "provider_disabled",503);
   demand(DIGEST.test(env.SIGNER_FINGERPRINT)&&DIGEST.test(env.TRUSTED_AGENTPROOF_SIGNER_FINGERPRINT)&&
+    DIGEST.test(env.TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT)&&
+    DIGEST.test(env.TRUSTED_DONESTATE_HANDOFF_FINGERPRINT)&&
     DIGEST.test(env.TRUSTED_PROVENANCE_SIGNER_FINGERPRINT),"trust_not_configured",503);
   let subject;
   try{subject=JSON.parse(env.TARGET_SUBJECT_JSON);}catch{throw new Denied("target_unconfigured",503);}
@@ -70,38 +72,14 @@ async function strictBody(request){
   try{value=JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks)));}
   catch{throw new Denied("invalid_json",400);}
   demand(value&&typeof value==="object"&&!Array.isArray(value)&&
-    Object.keys(value).sort().join(" ")==="receipt runId transactionId",
+    Object.keys(value).sort().join(" ")==="handoff receipt runId transactionId",
     "unexpected_request_fields",400);
   return value;
 }
-export async function checkReceipt(receipt,subject,env) {
-  demand(receipt&&Object.keys(receipt).sort().join(" ")==="payload proof","receipt_shape");
-  const p=receipt.payload, proof=receipt.proof;
-  demand(p?.actionType==="agentproof.release.v1"&&
-    p?.schemaId==="agentproof.signed-receipt.v2"&&p?.schemaVersion==="2.0.0"&&
-    p?.verificationState==="verified_provider_readback"&&
-    p?.independentOutcomeVerified===false&&p?.compensationState==="not_supported",
-    "receipt_class_rejected");
-  demand(p.subject?.owner===subject.owner&&p.subject?.repository===subject.repository&&
-    p.subject?.repositoryId===subject.repositoryId&&p.subject?.releaseId===subject.releaseId&&
-    p.subject?.tagCommit===subject.tagCommit&&
-    p.subject?.packageAssetId===subject.packageAssetId&&p.subject?.provenanceAssetId===subject.provenanceAssetId&&
-    p.subject?.packageDigest===subject.packageDigest&&p.subject?.provenanceDigest===subject.provenanceDigest,
-    "receipt_target_rejected");
-  demand(proof?.algorithm==="Ed25519"&&
-    proof.signerFingerprint===env.TRUSTED_AGENTPROOF_SIGNER_FINGERPRINT&&
-    fingerprint(proof.publicKeyPem)===proof.signerFingerprint,
-    "receipt_signer_untrusted");
-  const canonical=RECEIPT_DOMAIN+stableJson(p);
-  demand(proof.payloadDigest===await sha256(canonical)&&
-    typeof proof.signatureBase64==="string"&&/^[A-Za-z0-9+/]{86}==$/.test(proof.signatureBase64),
-    "receipt_digest_rejected");
-  const signature=Buffer.from(proof.signatureBase64,"base64");
-  demand(signature.length===64&&
-    verifyEd(null,Buffer.from(canonical),createPublicKey(proof.publicKeyPem),signature),
-    "receipt_signature_rejected");
-  demand(p.subjectDigest===await sha256(stableJson(p.subject)),"receipt_subject_digest_rejected");
-  return proof.payloadDigest;
+// Full release-domain verification includes approval, intent, timestamps,
+// exact draft-to-publication readback, separate trust roots and both signatures.
+export async function checkReceipt(receipt,subject,env,now=Date.now()) {
+  return (await validateReleaseReceipt(receipt,subject,env,now)).receiptPayloadDigest;
 }
 function signer(env){
   const key=createPrivateKey(env.SIGNING_PRIVATE_KEY_PEM);
@@ -110,11 +88,17 @@ function signer(env){
     fingerprint(publicKeyPem)===env.SIGNER_FINGERPRINT,"signer_key_invalid",503);
   return{key,publicKeyPem};
 }
-export async function evaluate(body,env,now=Date.now(),readerFactory=s=>new PublicReleaseReader(s)){
+export async function evaluate(body,env,now=Date.now(),readerFactory=s=>new PublicReleaseReader(s),githubRunId){
   const subject=trust(env);
   demand(typeof body.runId==="string"&&/^[a-f0-9-]{36}$/.test(body.runId)&&
     body.transactionId===body.receipt?.payload?.transactionId,"run_binding_invalid");
-  const receiptPayloadDigest=await checkReceipt(body.receipt,subject,env);
+  const receiptBinding=await validateReleaseReceipt(body.receipt,subject,env,now);
+  const receiptPayloadDigest=receiptBinding.receiptPayloadDigest;
+  demand(typeof githubRunId==="string"&&/^\d{1,20}$/.test(githubRunId),"github_run_unbound");
+  validateRunHandoff(body.handoff,{
+    runId:body.runId,transactionId:body.transactionId,
+    subjectDigest:receiptBinding.subjectDigest,receiptPayloadDigest,githubRunId,
+  },env,now);
   const reader=readerFactory(subject);
   const observation=await verifyReleaseV1Bytes({subject,reader,
     trustedProvenanceFingerprints:[env.TRUSTED_PROVENANCE_SIGNER_FINGERPRINT],now});
@@ -148,7 +132,7 @@ export async function handle(request,env,authenticateRequest=authenticate){
     demand(request.method==="POST"&&url.pathname==="/v1/verify","route_not_found",404);
     const claims=await authenticateRequest(request,env);
     const body=await strictBody(request);
-    return reply(await evaluate(body,env));
+    return reply(await evaluate(body,env,Date.now(),s=>new PublicReleaseReader(s),claims.runId));
   }catch(error){
     return reply({error:error instanceof Denied?error.code:"verification_unavailable"},
       error instanceof Denied?error.status:503);
