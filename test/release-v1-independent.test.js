@@ -21,7 +21,7 @@ const baseSubject = {
 async function fixture() {
   const signer = "sha256:" + await sha256(spkiDer);
   const withoutManifestDigest = { ...baseSubject, packageDigest: "sha256:" + await sha256(packageBytes) };
-  const { provenanceDigest, ...subjectForManifest } = withoutManifestDigest;
+  const { provenanceDigest, provenanceAssetId, ...subjectForManifest } = withoutManifestDigest;
   const unsigned = {
     schema: "opstruth.release-v1.provenance.v1",
     subjectDigest: await sha256(stableJson(subjectForManifest)),

@@ -1,0 +1,33 @@
+name: Isolated read-only release verification checks
+on:
+  pull_request:
+    paths:
+      - "services/release-verifier/**"
+      - "verification-kits/release-v1/**"
+      - "test/release-v1-independent.test.js"
+      - ".github/workflows/release-verifier-check.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/release-verifier/**"
+      - "verification-kits/release-v1/**"
+      - "test/release-v1-independent.test.js"
+      - ".github/workflows/release-verifier-check.yml"
+permissions:
+  contents: read
+jobs:
+  release-verifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4 pinned
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4 pinned
+        with:
+          node-version: 24
+      - name: Assert independent read-only trust boundary
+        run: npm run check
+      - name: Verify separate, disabled release verifier
+        working-directory: services/release-verifier
+        run: npm ci --ignore-scripts && npm run check && npm audit --audit-level=high

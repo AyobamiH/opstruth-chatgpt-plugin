@@ -1,0 +1,16 @@
+{
+  "name": "@oneclicksystems/opstruth-release-verifier",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test cases/*.check.mjs",
+    "check": "npm test && wrangler deploy --config wrangler.jsonc --dry-run"
+  },
+  "dependencies": {
+    "jose": "6.2.12"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.1"
+  }
+}
