@@ -69,3 +69,9 @@ Private-repository evidence brokerage, managed longitudinal storage, a verifier 
 - Root cause was isolated to the exact-commit GitHub verification evidence adapter: GitHub supplies a numeric repository ID, but OpsTruth converted it with `String(metadata.id)` before building the signed report.
 - The repair converts only the exact-commit verification evidence repository ID to `Number(metadata.id)` and adds a regression assertion that the value remains numeric. General repository-audit snapshot semantics are unchanged.
 - The repaired source passed CI, deployed, returned a strict complete v2 response for PR #115 head `41f1ae3b0fed670e64bd99f1bcb1aea9c9e7e869`, and DoneState reached terminal `VERIFIED`; the earlier malformed response remains part of the failure history rather than being reclassified.
+
+## 17 October 2026 — Independent release v1 verification kit (source only)
+
+A new, non-deployed [read-only release verification kit](../verification-kits/release-v1/README.md) handles one exact AgentProof release v1 candidate: fixed GitHub numeric identities, tag SHA, package/provenance asset IDs, downloaded byte SHA-256 digests, a pinned independently signed provenance manifest, and strict freshness. Its fixture results distinguish VERIFIED, CONTRADICTED and UNPROVEN, and **always** report `independentAttestationIssued:false`. This is not a signed production OpsTruth verification response or DoneState terminal VERIFIED. Public MCP tools, deployed Worker, credential and signing authorities, and the pinned DoneState v2 PR verifier remain unchanged.
+
+AgentProof source merge [#15](https://github.com/AyobamiH/agentproof/pull/15) implements a separately gated action candidate, not a release entitlement. A real independently brokered GET-only release verifier, production signing/handoff, trusted live provenance, and actual release canary remain distinct future gates. No external adopter evidence is inferred.
