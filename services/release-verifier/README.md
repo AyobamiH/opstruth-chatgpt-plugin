@@ -17,3 +17,9 @@ Only after a verified byte observation can this separate service issue a signed,
 Run npm ci --ignore-scripts, npm run check and npm audit --audit-level=high here, and the normal root OpsTruth checks. Committed Wrangler state is disabled with zero source pin, no target or signing key. A genuine production activation still requires a reviewed exact target, separate issuer/trust pins, a proper real release, trusted signing-key provisioning and independently observed proof.
 
 Current blocker on 17 October: the environment refused the upstream disposable draft release creation and the credential-bearing orchestration script. No actual release, production-signed verification, deployed release-verifier authority or DoneState terminal customer outcome has been accepted. The live public OpsTruth plugin must remain untouched.
+
+## 18 October acceptance preparation: exact source identity
+
+The isolated Worker is deployed disabled, with its own encrypted signing key; the exact disposable draft and separately signed provenance exist. Actual publication and signed production acceptance remain pending. The public OpsTruth MCP is unchanged.
+
+The health response preserves legacy sourceCommit as the permitted caller-workflow revision and explicitly exposes trustedWorkflowCommit plus serviceSourceCommit for the reviewed OpsTruth build revision. An unconfigured serviceSourceCommit is null. Activation records both exact revisions and the Cloudflare version, and the canary refuses a mismatch in either. This evidence-only metadata change adds no network access, mutation, credential or signing authority. The separate maintenance plane deploys reviewed source; OpsTruth remains GET-only against the inspected release.
