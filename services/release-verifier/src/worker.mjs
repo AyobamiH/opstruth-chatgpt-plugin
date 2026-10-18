@@ -134,7 +134,8 @@ export async function handle(request,env,authenticateRequest=authenticate){
     demand(!url.search,"query_not_supported",400);
     if(request.method==="GET"&&url.pathname==="/health")return reply({
       service:"opstruth-release-verifier",enabled:env.ENABLED==="true",
-      sourceCommit:env.TRUSTED_SOURCE_SHA,readOnly:true,
+      sourceCommit:env.TRUSTED_SOURCE_SHA,trustedWorkflowCommit:env.TRUSTED_SOURCE_SHA,
+      serviceSourceCommit:env.SERVICE_SOURCE_SHA??null,readOnly:true,
       independentSignerConfigured:!!env.SIGNING_PUBLIC_KEY_PEM,
     });
     demand(request.method==="POST"&&url.pathname==="/v1/verify","route_not_found",404);
