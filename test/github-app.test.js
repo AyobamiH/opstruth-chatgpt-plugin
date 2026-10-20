@@ -340,3 +340,77 @@ test("private broker checks immutable identity and visibility while retaining re
   const broad = createGithubAppClient(appEnv(), REPOSITORY, clientOptions(async () => Response.json(tokenResponse({ repositories: [metadata], permissions: { contents: "write" } })), { expectedVisibility: "private" }));
   await assert.rejects(broad.json(`/repos/${REPOSITORY}`));
 });
+
+
+const REVIEW_REPOSITORY = "Example/donestate-review-fixture";
+const REVIEW_REPOSITORY_ID = "515151";
+function reviewEnv(overrides = {}) {
+  return appEnv({
+    OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY: REVIEW_REPOSITORY,
+    OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY_ID: REVIEW_REPOSITORY_ID,
+    ...overrides,
+  });
+}
+
+test("review fixture and primary repository mint separate exact read-only tokens", async () => {
+  for (const [repository, id] of [[REPOSITORY, 424242], [REVIEW_REPOSITORY, 515151]]) {
+    let calls = 0;
+    const metadata = { id, full_name: repository, private: false, visibility: "public" };
+    const client = createGithubAppClient(reviewEnv(), repository, clientOptions(async (request) => {
+      calls += 1;
+      if (request.method === "POST") {
+        assert.deepEqual(await request.json(), {
+          repositories: [repository.split("/")[1]],
+          permissions: { checks: "read", contents: "read", statuses: "read" },
+        });
+        return Response.json(tokenResponse({ repositories: [metadata] }));
+      }
+      assert.equal(new URL(request.url).pathname, "/repos/" + repository);
+      return Response.json(metadata);
+    }));
+    client.assertSelectedRepository(await client.json("/repos/" + repository));
+    assert.equal(calls, 2);
+  }
+  assert.equal(githubAppHealth(reviewEnv()).configured, true);
+});
+
+test("review access is exact configuration, never a repository prefix grant", async () => {
+  let calls = 0;
+  const options = clientOptions(async () => { calls += 1; });
+  for (const repository of ["Example/donestate-review-other", "Other/donestate-review-fixture", "Example/another"]) {
+    assert.throws(() => createGithubAppClient(reviewEnv(), repository, options), { code: "GITHUB_APP_REPOSITORY_NOT_ALLOWED" });
+  }
+  assert.throws(() => createGithubAppClient(appEnv(), REVIEW_REPOSITORY, options), { code: "GITHUB_APP_REPOSITORY_NOT_ALLOWED" });
+  assert.throws(() => createGithubAppClient(reviewEnv(), REVIEW_REPOSITORY, { ...options, expectedVisibility: "private" }), { code: "GITHUB_APP_REPOSITORY_NOT_ALLOWED" });
+  assert.equal(calls, 0);
+});
+
+test("partial or broadened review configuration fails closed before network access", () => {
+  for (const overrides of [
+    { OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY: "" },
+    { OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY_ID: "" },
+    { OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY_ID: "0" },
+    { OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY_ID: "424242" },
+    { OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY: "Other/donestate-review-fixture" },
+    { OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY: "Example/production" },
+    { OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY: "Example/donestate-review-*" },
+  ]) {
+    const env = reviewEnv(overrides);
+    assert.equal(githubAppHealth(env).configured, false);
+    assert.throws(() => createGithubAppClient(env, REVIEW_REPOSITORY), { code: "GITHUB_APP_CONFIGURATION_INVALID" });
+  }
+});
+
+test("review token rejects wrong immutable identity, extra repositories and write authority", async () => {
+  const metadata = { id: 515151, full_name: REVIEW_REPOSITORY, private: false, visibility: "public" };
+  for (const override of [
+    { repositories: [{ ...metadata, id: 424242 }] },
+    { repositories: [{ ...metadata, private: true, visibility: "private" }] },
+    { repositories: [metadata, { id: 424242, full_name: REPOSITORY, private: false, visibility: "public" }] },
+    { permissions: { checks: "read", contents: "write", metadata: "read", statuses: "read" } },
+  ]) {
+    const client = createGithubAppClient(reviewEnv(), REVIEW_REPOSITORY, clientOptions(async () =>
+      Response.json(tokenResponse({ repositories: [metadata], ...override }))));
+    await assert.rejects(client.json("/repos/" + REVIEW_REPOSITORY), { code: "GITHUB_APP_SCOPE_INVALID" });
+  }
+});
