@@ -40,7 +40,7 @@ async function fixture() {
   const metadata = { owner: subject.owner, repository: subject.repository,
     ownerId: subject.ownerId, repositoryId: subject.repositoryId, releaseId: subject.releaseId,
     tagName: subject.tagName, tagCommit: subject.tagCommit,
-    prerelease: true, draft: false, publishedAt: new Date(now - 2000).toISOString(),
+    prerelease: true, draft: false, publishedAt: new Date(now - 2000).toISOString(), observedAt: new Date(now).toISOString(),
     packageAssetId: subject.packageAssetId, packageAssetName: subject.packageAssetName,
     packageDigest: subject.packageDigest, provenanceAssetId: subject.provenanceAssetId,
     provenanceDigest: subject.provenanceDigest, assetCount: 2 };
@@ -112,8 +112,8 @@ test("untrusted provenance signer or missing actual asset bytes cannot yield VER
   assert.equal(missing.reasonCode, "provider_read_unavailable");
 });
 
-test("stale published observation and unavailable provider remain unproven or contradicted", async () => {
-  const f = await fixture();f.metadata.publishedAt = new Date(now - 20 * 60_000).toISOString();
+test("stale metadata observation and unavailable provider remain unproven or contradicted", async () => {
+  const f = await fixture();f.metadata.observedAt = new Date(now - 20 * 60_000).toISOString();
   assert.equal((await run(f)).reasonCode, "release_observation_stale");
   f.reader.observe = async () => { throw Error("provider down"); };
   assert.equal((await run(f)).reasonCode, "provider_read_unavailable");
@@ -143,4 +143,24 @@ test("provenance content/Ed25519 signature are independently checked even when b
   const output = await run(f);
   assert.equal(output.verdict, "CONTRADICTED");
   assert.equal(output.reasonCode, "provenance_signature_invalid");
+});
+
+
+test("historical publication can be freshly verified; publication in the future cannot", async () => {
+  const f = await fixture();
+  f.metadata.publishedAt = new Date(now - 2 * 24 * 3600_000).toISOString();
+  assert.equal((await run(f)).verdict, "VERIFIED");
+  f.metadata.publishedAt = new Date(now + 120_000).toISOString();
+  assert.equal((await run(f)).reasonCode, "publication_time_invalid");
+  f.metadata.publishedAt = new Date(now - 2000).toISOString();
+  delete f.metadata.observedAt;
+  assert.equal((await run(f)).verdict, "CONTRADICTED");
+});
+
+test("the bounded public reader's subject contradiction cannot become a retryable outage", async () => {
+  const f = await fixture();
+  f.reader.observe = async () => { throw Error("read_only_release:tag_commit_changed"); };
+  const result = await run(f);
+  assert.equal(result.verdict, "CONTRADICTED");
+  assert.equal(result.reasonCode, "observed_release_subject_changed");
 });

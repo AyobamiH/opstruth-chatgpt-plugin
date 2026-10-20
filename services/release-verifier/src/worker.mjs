@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { createPrivateKey, createPublicKey, sign as signEd, createHash } from "node:crypto";
 import { stableJson } from "../../../src/utils.js";
-import { validateReleaseReceipt, validateRunHandoff } from "./trust.mjs";
+import { validateReleaseReceipt, validateRunHandoff, validateRecoveryObservation } from "./trust.mjs";
 import { verifyReleaseV1Bytes } from "../../../verification-kits/release-v1/verify.js";
 import { PublicReleaseReader } from "./github-reader.mjs";
 
@@ -23,8 +23,9 @@ function fingerprint(publicKeyPem){
   demand(key.asymmetricKeyType==="ed25519","wrong_key_algorithm",503);
   return "sha256:"+createHash("sha256").update(key.export({type:"spki",format:"der"})).digest("hex");
 }
-function trust(env){
-  demand(env.ENABLED==="true"&&REF.test(env.TRUSTED_SOURCE_SHA)&&!/^0+$/.test(env.TRUSTED_SOURCE_SHA),
+function trust(env,{recovery=false}={}){
+  demand((recovery?env.READBACK_RECOVERY_ENABLED:env.ENABLED)==="true"&&
+    REF.test(env.TRUSTED_SOURCE_SHA)&&!/^0+$/.test(env.TRUSTED_SOURCE_SHA),
     "provider_disabled",503);
   demand(DIGEST.test(env.SIGNER_FINGERPRINT)&&DIGEST.test(env.TRUSTED_AGENTPROOF_SIGNER_FINGERPRINT)&&
     DIGEST.test(env.TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT)&&
@@ -96,17 +97,19 @@ function signer(env){
     fingerprint(publicKeyPem)===env.SIGNER_FINGERPRINT,"signer_key_invalid",503);
   return{key,publicKeyPem};
 }
-export async function evaluate(body,env,now=Date.now(),readerFactory=s=>new PublicReleaseReader(s),githubRunId){
-  const subject=trust(env);
+async function evaluateBound(body,env,now,readerFactory,githubRunId,{recovery=false}={}){
+  const started=performance.now();
+  const subject=trust(env,{recovery});
   demand(typeof body.runId==="string"&&/^[a-f0-9-]{36}$/.test(body.runId)&&
     body.transactionId===body.receipt?.payload?.transactionId,"run_binding_invalid");
-  const receiptBinding=await validateReleaseReceipt(body.receipt,subject,env,now);
+  const receiptBinding=await validateReleaseReceipt(body.receipt,subject,env,now,{historical:recovery});
   const receiptPayloadDigest=receiptBinding.receiptPayloadDigest;
   demand(typeof githubRunId==="string"&&/^\d{1,20}$/.test(githubRunId),"github_run_unbound");
-  validateRunHandoff(body.handoff,{
+  const handoffBinding={
     runId:body.runId,transactionId:body.transactionId,
     subjectDigest:receiptBinding.subjectDigest,receiptPayloadDigest,githubRunId,
-  },env,now);
+  };
+  validateRunHandoff(body.handoff,handoffBinding,env,now);
   const reader=readerFactory(subject);
   const observation=await verifyReleaseV1Bytes({subject,reader,
     trustedProvenanceFingerprints:[env.TRUSTED_PROVENANCE_SIGNER_FINGERPRINT],now});
@@ -115,6 +118,11 @@ export async function evaluate(body,env,now=Date.now(),readerFactory=s=>new Publ
   if(observation.verdict!=="VERIFIED")
     return {state:observation.verdict,reasonCode:observation.reasonCode,
       signed:false,observation};
+  const completedAt=now+Math.max(0,Math.floor(performance.now()-started));
+  // The authority may expire while bytes are in flight. A successful read
+  // cannot extend either capability's lifetime or license a late signature.
+  if(recovery)await validateRecoveryObservation(body.observation,body.receipt,env,completedAt);
+  validateRunHandoff(body.handoff,handoffBinding,env,completedAt);
   const subjectDigest=body.receipt.payload.subjectDigest;
   const unsigned={schema:"opstruth.release-v1-signed-outcome.v1",
     runId:body.runId,transactionId:body.transactionId,
@@ -128,12 +136,35 @@ export async function evaluate(body,env,now=Date.now(),readerFactory=s=>new Publ
       material.key).toString("base64")};
   return {state:"VERIFIED",signed:true,report:{...unsigned,signature}};
 }
+export async function evaluate(body,env,now=Date.now(),readerFactory=s=>new PublicReleaseReader(s),githubRunId){
+  return evaluateBound(body,env,now,readerFactory,githubRunId);
+}
+export async function evaluateRecovery(body,env,now=Date.now(),readerFactory=s=>new PublicReleaseReader(s)){
+  try {
+    trust(env,{recovery:true});
+    demand(body&&Object.getPrototypeOf(body)===Object.prototype&&
+      Object.keys(body).sort().join(" ")==="handoff observation receipt"&&
+      new TextEncoder().encode(JSON.stringify(body)).byteLength<=64*1024,
+      "unexpected_recovery_fields",400);
+    const binding=await validateRecoveryObservation(body.observation,body.receipt,env,now);
+    return await evaluateBound({...body,runId:binding.runId,transactionId:binding.transactionId},
+      env,now,readerFactory,binding.githubRunId,{recovery:true});
+  } catch(error) {
+    // RPC errors must remain bounded reason codes; no provider response,
+    // credentials, key material, or caller-supplied exception text escapes.
+    const trustCode=error instanceof Error&&/^release_trust:[a-z_]+$/.test(error.message)
+      ?error.message.slice("release_trust:".length):null;
+    return {state:"BLOCKED",signed:false,
+      reasonCode:error instanceof Denied?error.code:trustCode??"verification_unavailable"};
+  }
+}
 export async function handle(request,env,authenticateRequest=authenticate){
   try{
     const url=new URL(request.url);
     demand(!url.search,"query_not_supported",400);
     if(request.method==="GET"&&url.pathname==="/health")return reply({
       service:"opstruth-release-verifier",enabled:env.ENABLED==="true",
+      readbackRecoveryEnabled:env.READBACK_RECOVERY_ENABLED==="true",
       sourceCommit:env.TRUSTED_SOURCE_SHA,trustedWorkflowCommit:env.TRUSTED_SOURCE_SHA,
       serviceSourceCommit:env.SERVICE_SOURCE_SHA??null,readOnly:true,
       independentSignerConfigured:!!env.SIGNING_PUBLIC_KEY_PEM,

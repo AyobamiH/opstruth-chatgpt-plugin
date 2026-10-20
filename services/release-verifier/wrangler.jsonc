@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "opstruth-release-verify",
   "account_id": "6ddcbcb8474f1a7e460b2f0aabec0e2f",
-  "main": "src/worker.mjs",
+  "main": "src/entrypoint.mjs",
   "compatibility_date": "2026-10-17",
   "compatibility_flags": [
     "nodejs_compat"
@@ -12,6 +12,12 @@
   "vars": {
     "ROLE": "release-verifier",
     "ENABLED": "false",
+    "READBACK_RECOVERY_ENABLED": "false",
+    "READBACK_RECOVERY_RUN_ID": "",
+    "READBACK_RECOVERY_GITHUB_RUN_ID": "",
+    "READBACK_RECOVERY_TRANSACTION_ID": "",
+    "READBACK_RECOVERY_COMPLETION_DIGEST": "",
+    "READBACK_RECOVERY_AUTHORISATION_DIGEST": "",
     "TRUSTED_SOURCE_SHA": "0000000000000000000000000000000000000000",
     "AUDIENCE": "https://opstruth-release-verify.woeinvests.workers.dev",
     "TARGET_SUBJECT_JSON": ""

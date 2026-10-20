@@ -7,6 +7,10 @@ const COMMIT = /^[0-9a-f]{40}$/;
 const MAX_PACKAGE_BYTES = 64 * 1024 * 1024;
 const MAX_PROVENANCE_BYTES = 256 * 1024;
 const MAX_AGE_MS = 15 * 60_000;
+const READER_CONTRADICTIONS = new Set(["subject_changed", "repository_not_allowed",
+  "repository_identity_changed", "tag_commit_changed", "release_identity_changed",
+  "release_asset_changed", "download_url_not_allowlisted", "redirect_target_rejected",
+  "unsupported_download_host"]);
 const bytes = new TextEncoder();
 
 function demand(condition, code) { if (!condition) throw new Error("release_verification:" + code); }
@@ -30,7 +34,7 @@ function checkSubject(value) {
     "subject_assets");
 }
 const metadataFields = ["owner", "repository", "ownerId", "repositoryId", "releaseId", "tagName",
-  "tagCommit", "prerelease", "draft", "publishedAt", "packageAssetId", "packageAssetName",
+  "tagCommit", "prerelease", "draft", "publishedAt", "observedAt", "packageAssetId", "packageAssetName",
   "packageDigest", "provenanceAssetId", "provenanceDigest", "assetCount"];
 function checkMetadata(value, subject) {
   exact(value, metadataFields, "metadata");
@@ -90,9 +94,11 @@ async function checkProvenance(value, subject, packageSha, trustedFingerprints, 
  */
 export async function verifyReleaseV1Bytes({ subject, reader, trustedProvenanceFingerprints,
   now = Date.now(), maxAgeMs = MAX_AGE_MS }) {
+  const started = performance.now();
+  const observedTime = () => now + Math.max(0, Math.floor(performance.now() - started));
   const result = (verdict, reasonCode, evidence = {}) => ({
     schema: "opstruth.release-v1.observation.v1", verdict, reasonCode,
-    subjectDigest: null, observedAt: new Date(now).toISOString(), readOnly: true,
+    subjectDigest: null, observedAt: new Date(observedTime()).toISOString(), readOnly: true,
     source: "injected-read-only-release-reader", independentAttestationIssued: false,
     ...evidence,
   });
@@ -114,13 +120,24 @@ export async function verifyReleaseV1Bytes({ subject, reader, trustedProvenanceF
     provenanceBytes = await reader.downloadAsset(subject.provenanceAssetId, MAX_PROVENANCE_BYTES);
     checkBytes(packageBytes, MAX_PACKAGE_BYTES, "package");
     checkBytes(provenanceBytes, MAX_PROVENANCE_BYTES, "provenance");
-  } catch {
+  } catch (error) {
+    const readerCode = error instanceof Error && error.message.startsWith("read_only_release:")
+      ? error.message.slice("read_only_release:".length) : null;
+    if (READER_CONTRADICTIONS.has(readerCode))
+      return result("CONTRADICTED", "observed_release_subject_changed", { subjectDigest });
     return result("UNPROVEN", "provider_read_unavailable", { subjectDigest });
   }
   try {
     checkMetadata(metadata, subject);
     const publishedAt = Date.parse(metadata.publishedAt);
-    demand(publishedAt <= now + 60_000 && publishedAt >= now - maxAgeMs, "release_observation_stale");
+    const metadataObservedAt = Date.parse(metadata.observedAt), finishedAt = observedTime();
+    // Publication is an immutable historical event. Freshness belongs to the
+    // independent read, never to the original publication timestamp.
+    demand(typeof metadata.observedAt === "string" && Number.isFinite(metadataObservedAt) &&
+      new Date(metadataObservedAt).toISOString() === metadata.observedAt &&
+      metadataObservedAt <= finishedAt + 60_000 && metadataObservedAt >= finishedAt - maxAgeMs &&
+      finishedAt - now <= maxAgeMs, "release_observation_stale");
+    demand(publishedAt <= metadataObservedAt + 60_000, "publication_time_invalid");
     const actualPackageSha = await sha256(packageBytes);
     const actualProvenanceSha = await sha256(provenanceBytes);
     demand("sha256:" + actualPackageSha === subject.packageDigest &&
@@ -129,7 +146,7 @@ export async function verifyReleaseV1Bytes({ subject, reader, trustedProvenanceF
     demand(decoded.length <= MAX_PROVENANCE_BYTES && !decoded.includes("\0"), "provenance_encoding");
     const manifest = JSON.parse(decoded);
     const fingerprint = await checkProvenance(manifest, subject, actualPackageSha,
-      trustedProvenanceFingerprints, now);
+      trustedProvenanceFingerprints, finishedAt);
     return result("VERIFIED", "exact_release_bytes_and_signed_provenance_match", {
       subjectDigest, packageSha256: actualPackageSha, provenanceSha256: actualProvenanceSha,
       provenanceSignerFingerprint: fingerprint, releaseId: subject.releaseId,

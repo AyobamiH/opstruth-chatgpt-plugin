@@ -3,133 +3,14 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync, sign as signEd, verify as verifyEd,
   createHash, randomUUID } from "node:crypto";
 import { stableJson, sha256 } from "../../../src/utils.js";
-import { evaluate, checkReceipt, validateClaims } from "../src/worker.mjs";
-import { validateReleaseReceipt, validateRunHandoff, HANDOFF_DOMAIN } from "../src/trust.mjs";
+import { evaluate, evaluateRecovery, checkReceipt, validateClaims, handle } from "../src/worker.mjs";
+import { validateReleaseReceipt, validateRunHandoff, HANDOFF_DOMAIN, READBACK_DOMAIN } from "../src/trust.mjs";
 import { PublicReleaseReader } from "../src/github-reader.mjs";
 import { RELEASE_PROVENANCE_DOMAIN } from "../../../verification-kits/release-v1/verify.js";
 
-const hash = s => createHash("sha256").update(s).digest("hex");
-const kp = () => {
-  const pair=generateKeyPairSync("ed25519");
-  const publicKeyPem=pair.publicKey.export({type:"spki",format:"pem"}).toString();
-  const fingerprint="sha256:"+hash(pair.publicKey.export({type:"spki",format:"der"}));
-  return {publicKeyPem, fingerprint,
-    privateKey:pair.privateKey,
-    sign:s=>signEd(null,Buffer.from(s),pair.privateKey).toString("base64")};
-};
-const ap=kp(),approval=kp(),op=kp(),provenance=kp(),handoffSigner=kp();
-const target={
-  schema:"opstruth.release-v1.subject.v1",owner:"AyobamiH",repository:"agentproof-release-canary",
-  ownerId:47716486,repositoryId:1423718326,releaseId:8001,
-  tagName:"v0.0.1-rc.1",tagCommit:"a".repeat(40),
-  packageAssetId:8002,packageAssetName:"canary-package.tgz",
-  packageDigest:"",provenanceAssetId:8003,provenanceDigest:"",
-};
-const stamp=Date.now(), githubRunId="3";
-async function fixture(){
-  const blob=new TextEncoder().encode("synthetic package with independently hashed bytes");
-  const partial={...target,packageDigest:"sha256:"+await sha256(blob)};
-  const {provenanceDigest:_,provenanceAssetId:__ignoreSelfAssetId,...withoutSelfDigest}=partial;
-  const unsignedManifest={
-    schema:"opstruth.release-v1.provenance.v1",
-    subjectDigest:await sha256(stableJson(withoutSelfDigest)),
-    packageSha256:await sha256(blob),issuer:"independent-canary-provenance-issuer",
-    issuedAt:new Date(stamp-2500).toISOString(),
-  };
-  const provenanceAsset=new TextEncoder().encode(JSON.stringify({
-    ...unsignedManifest,signature:{
-      algorithm:"Ed25519",publicKeyPem:provenance.publicKeyPem,
-      signerFingerprint:provenance.fingerprint,
-      signatureBase64:provenance.sign(RELEASE_PROVENANCE_DOMAIN+stableJson(unsignedManifest)),
-    },
-  }));
-  const subject={...partial,provenanceDigest:"sha256:"+await sha256(provenanceAsset)};
-  const agentSubject={
-    schema:"agentproof.release.subject.v1",provider:"github",
-    owner:subject.owner,repository:subject.repository,ownerId:subject.ownerId,
-    repositoryId:subject.repositoryId,releaseId:subject.releaseId,tagName:subject.tagName,
-    tagCommit:subject.tagCommit,packageAssetId:subject.packageAssetId,
-    packageAssetName:subject.packageAssetName,packageDigest:subject.packageDigest,
-    provenanceAssetId:subject.provenanceAssetId,provenanceDigest:subject.provenanceDigest,
-    prerelease:true,makeLatest:false,
-  };
-  const runId=randomUUID(),transactionId=randomUUID(),nonce="canary-nonce-"+randomUUID(),
-    idempotencyKey="canary-idempotency-"+randomUUID(),subjectDigest=await sha256(stableJson(agentSubject));
-  const decidedAt=new Date(stamp-40_000).toISOString(),
-    expiresAt=new Date(stamp+250_000).toISOString(),
-    attemptedAt=new Date(stamp-25_000).toISOString(),
-    verifiedAt=new Date(stamp-12_000).toISOString(),
-    issuedAt=new Date(stamp-10_000).toISOString();
-  const unsignedApproval={
-    schema:"agentproof.release.approval.v1",actionType:"agentproof.release.v1",
-    subjectDigest,transactionId,nonce,decision:"approved",environment:"production",
-    issuer:"agentproof.release-canary.authority.v1",decidedAt,expiresAt,
-    authorityPublicKeyPem:approval.publicKeyPem,
-  };
-  const signedApproval={...unsignedApproval,
-    signatureBase64:approval.sign(stableJson(unsignedApproval))};
-  const observation=(draft)=>({
-    schema:"agentproof.release.observation.v1",
-    ownerId:agentSubject.ownerId,repositoryId:agentSubject.repositoryId,
-    releaseId:agentSubject.releaseId,tagName:agentSubject.tagName,
-    tagCommit:agentSubject.tagCommit,packageAssetId:agentSubject.packageAssetId,
-    packageAssetName:agentSubject.packageAssetName,packageDigest:agentSubject.packageDigest,
-    provenanceAssetId:agentSubject.provenanceAssetId,
-    provenanceDigest:agentSubject.provenanceDigest,assetCount:2,
-    draft,prerelease:true,publishedAt:draft?null:verifiedAt,
-  });
-  const payload={
-    schemaId:"agentproof.signed-receipt.v2",schemaVersion:"2.0.0",
-    receiptFormatVersion:"v2",actionType:"agentproof.release.v1",
-    receiptId:randomUUID(),issuedAt,transactionId,nonce,idempotencyKey,
-    subject:agentSubject,subjectDigest,approval:signedApproval,
-    approvalDigest:await sha256(stableJson(signedApproval)),
-    intentDigest:await sha256(stableJson({transactionId,idempotencyKey,nonce,subjectDigest})),
-    effect:"publish_exact_existing_draft_prerelease",
-    attemptedAt,verifiedAt,before:observation(true),after:observation(false),
-    verificationState:"verified_provider_readback",independentOutcomeVerified:false,
-    compensationState:"not_supported",signerRole:"independent_receipt_signer",
-    signingPolicyId:"agentproof.release-canary.receipts.v1",predecessorPayloadDigest:null,
-  };
-  const receiptInput="agentproof.signed-receipt.v2.release\0"+stableJson(payload);
-  const receipt={payload,proof:{
-    algorithm:"Ed25519",keyId:payload.signingPolicyId,
-    publicKeyPem:ap.publicKeyPem,signerFingerprint:ap.fingerprint,
-    payloadDigest:await sha256(receiptInput),signatureBase64:ap.sign(receiptInput),
-  }};
-  const handoffUnsigned={
-    schema:"donestate.release-verification-handoff.v1",
-    runId,transactionId,subjectDigest,receiptPayloadDigest:receipt.proof.payloadDigest,
-    githubRunId,issuedAt:new Date(stamp-4000).toISOString(),
-    expiresAt:new Date(stamp+250_000).toISOString(),issuer:"donestate.release-handoff",
-    publicKeyPem:handoffSigner.publicKeyPem,
-  };
-  const handoff={...handoffUnsigned,
-    signatureBase64:handoffSigner.sign(HANDOFF_DOMAIN+stableJson(handoffUnsigned))};
-  const reader={
-    async observe(){return{
-      owner:subject.owner,repository:subject.repository,
-      ownerId:subject.ownerId,repositoryId:subject.repositoryId,
-      releaseId:subject.releaseId,tagName:subject.tagName,tagCommit:subject.tagCommit,
-      prerelease:true,draft:false,publishedAt:new Date(stamp-2000).toISOString(),
-      packageAssetId:subject.packageAssetId,packageAssetName:subject.packageAssetName,
-      packageDigest:subject.packageDigest,provenanceAssetId:subject.provenanceAssetId,
-      provenanceDigest:subject.provenanceDigest,assetCount:2,
-    };},
-    async downloadAsset(id){return id===subject.packageAssetId?blob:provenanceAsset;},
-  };
-  const env={
-    ROLE:"release-verifier",ENABLED:"true",TRUSTED_SOURCE_SHA:"a".repeat(40),
-    TARGET_SUBJECT_JSON:JSON.stringify(subject),SIGNER_FINGERPRINT:op.fingerprint,
-    SIGNING_PUBLIC_KEY_PEM:op.publicKeyPem,
-    SIGNING_PRIVATE_KEY_PEM:op.privateKey.export({type:"pkcs8",format:"pem"}).toString(),
-    TRUSTED_AGENTPROOF_SIGNER_FINGERPRINT:ap.fingerprint,
-    TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT:approval.fingerprint,
-    TRUSTED_DONESTATE_HANDOFF_FINGERPRINT:handoffSigner.fingerprint,
-    TRUSTED_PROVENANCE_SIGNER_FINGERPRINT:provenance.fingerprint,
-  };
-  return{subject,receipt,reader,env,body:{runId,transactionId,receipt,handoff}};
-}
+import { hash, ap, approval, op, provenance, handoffSigner, target, stamp, githubRunId,
+  fixture, recoveryFixture } from "./fixtures.mjs";
+
 const verifyFixture=async(f, body=f.body,run=githubRunId)=>
   evaluate(body,f.env,stamp,()=>f.reader,run);
 const resign=(receipt)=>{
@@ -260,4 +141,157 @@ test("public read-only adapter performs only GitHub GETs with manual redirects",
   const observed=await reader.observe(f.subject);
   assert.equal(observed.repositoryId,1423718326);
   assert(urls.every(x=>x[1]==="GET"&&x[2]==="manual"));
+});
+
+const recoverFixture=f=>evaluateRecovery(f.recovery,f.env,stamp,()=>f.reader);
+
+test("binding-only recovery verifies a days-old receipt using fresh linked evidence and independent bytes",async()=>{
+  const f=await recoveryFixture(),before=stableJson(f.receipt),reads=[];
+  const observe=f.reader.observe,download=f.reader.downloadAsset;
+  f.reader.observe=async()=>{reads.push("metadata");return observe();};
+  f.reader.downloadAsset=async id=>{reads.push(id);return download(id);};
+  const result=await recoverFixture(f);
+  assert.equal(result.state,"VERIFIED");assert.equal(result.signed,true);
+  assert.equal(result.report.runId,f.body.runId);
+  assert.equal(result.report.receiptPayloadDigest,f.receipt.proof.payloadDigest);
+  assert.equal(stableJson(f.receipt),before,"original receipt is immutable");
+  assert.deepEqual(reads,["metadata",f.subject.packageAssetId,f.subject.provenanceAssetId]);
+  await assert.rejects(evaluate(f.body,{...f.env,ENABLED:"true"},stamp,()=>f.reader,githubRunId),
+    /receipt_timeline_invalid/,"public freshness policy remains unchanged");
+});
+
+test("recovery rejects forged, stale, drifted and foreign sidecars before any external read",async()=>{
+  const mutations=[
+    {readOnly:false},{runId:randomUUID()},{transactionId:randomUUID()},{githubRunId:"99"},
+    {workflowCommit:"f".repeat(40)},{requestDigest:"f".repeat(64)},
+    {completionDigest:"f".repeat(64)},{recoveryAuthorisationDigest:"f".repeat(64)},
+    {subjectDigest:"f".repeat(64)},
+    {observedAt:new Date(stamp-400_000).toISOString()},
+    {expiresAt:new Date(stamp-1).toISOString()},
+    {expiresAt:new Date(stamp+600_000).toISOString()},
+    {authorityPublicKeyPem:op.publicKeyPem},
+    {signatureBase64:Buffer.alloc(64,7).toString("base64")},
+  ];
+  for(const change of mutations){
+    const f=await recoveryFixture();let reads=0;
+    f.reader.observe=async()=>{reads++;throw Error("must not read");};
+    f.recovery.observation={...f.recovery.observation,...change};
+    const result=await recoverFixture(f);
+    assert.equal(result.state,"BLOCKED",Object.keys(change)[0]);
+    assert.equal(result.signed,false);assert.equal(reads,0);
+  }
+  const f=await recoveryFixture();
+  f.recovery.observation.after={...f.recovery.observation.after,releaseId:999};
+  assert.equal((await recoverFixture(f)).reasonCode,"readback_evidence_changed");
+});
+
+test("fresh readback cannot rescue a forged historical approval or a stale handoff",async()=>{
+  const f=await recoveryFixture();
+  f.recovery.receipt=structuredClone(f.receipt);
+  f.recovery.receipt.proof.signatureBase64=Buffer.alloc(64,5).toString("base64");
+  assert.equal((await recoverFixture(f)).reasonCode,"receipt_signature_invalid");
+  const g=await recoveryFixture();
+  g.recovery.handoff={...g.recovery.handoff,expiresAt:new Date(stamp-1).toISOString()};
+  assert.equal((await recoverFixture(g)).reasonCode,"handoff_expired");
+  const h=await recoveryFixture();
+  h.recovery.handoff={...h.recovery.handoff,runId:randomUUID()};
+  assert.equal((await recoverFixture(h)).reasonCode,"handoff_binding_invalid");
+});
+
+test("sidecar and handoff expiry during byte reads prevents a late recovery signature",async t=>{
+  let elapsed=0;t.mock.method(performance,"now",()=>elapsed);
+  for(const expired of ["observation","handoff"]){
+    elapsed=0;const f=await recoveryFixture(),value=f.recovery[expired];
+    value.expiresAt=new Date(stamp+1000).toISOString();
+    const {signatureBase64,...unsigned}=value;
+    value.signatureBase64=(expired==="observation"?approval:handoffSigner).sign(
+      (expired==="observation"?READBACK_DOMAIN:HANDOFF_DOMAIN)+stableJson(unsigned));
+    const download=f.reader.downloadAsset;
+    f.reader.downloadAsset=async id=>{elapsed=2000;return download(id);};
+    const result=await recoverFixture(f);
+    assert.equal(result.state,"BLOCKED");assert.equal(result.signed,false);
+    assert.equal(result.reasonCode,expired==="observation"?"readback_expired":"handoff_expired");
+  }
+});
+
+test("a recovery observation cannot precede its original verified execution",async()=>{
+  const f=await recoveryFixture(0),value=f.recovery.observation;
+  const observed=Date.parse(f.receipt.payload.verifiedAt)-1;
+  value.observedAt=new Date(observed).toISOString();
+  value.expiresAt=new Date(observed+300_000).toISOString();
+  const {signatureBase64,...unsigned}=value;
+  value.signatureBase64=approval.sign(READBACK_DOMAIN+stableJson(unsigned));
+  assert.equal((await recoverFixture(f)).reasonCode,"readback_expired");
+});
+
+test("recovery capability needs every immutable predecessor pin and rejects credential inputs",async()=>{
+  for(const name of ["READBACK_RECOVERY_ENABLED","READBACK_RECOVERY_RUN_ID",
+    "READBACK_RECOVERY_GITHUB_RUN_ID","READBACK_RECOVERY_TRANSACTION_ID",
+    "READBACK_RECOVERY_COMPLETION_DIGEST","READBACK_RECOVERY_AUTHORISATION_DIGEST"]){
+    const f=await recoveryFixture();delete f.env[name];
+    assert.equal((await recoverFixture(f)).state,"BLOCKED",name);
+  }
+  const f=await recoveryFixture();f.recovery.token="must-never-be-accepted-or-echoed";
+  const result=await recoverFixture(f);
+  assert.equal(result.reasonCode,"unexpected_recovery_fields");
+  assert(!JSON.stringify(result).includes(f.recovery.token));
+});
+
+test("outage, changed bytes and the existing provenance age limit cannot create signed recovery success",async()=>{
+  const f=await recoveryFixture();
+  f.reader.downloadAsset=async()=>{throw Error("provider unavailable with sensitive details");};
+  const outage=await recoverFixture(f);
+  assert.equal(outage.state,"UNPROVEN");assert.equal(outage.signed,false);
+  assert.equal(outage.reasonCode,"provider_read_unavailable");
+  assert(!JSON.stringify(outage).includes("sensitive"));
+  const g=await recoveryFixture();g.reader.downloadAsset=async()=>new Uint8Array([1,2,3]);
+  const changed=await recoverFixture(g);
+  assert.equal(changed.state,"CONTRADICTED");assert.equal(changed.signed,false);
+  const h=await recoveryFixture(32*24*3600_000);
+  const expired=await recoverFixture(h);
+  assert.equal(expired.state,"CONTRADICTED");assert.equal(expired.reasonCode,"provenance_time");
+  assert.equal(expired.signed,false);
+});
+
+test("public worker exposes neither unauthenticated recovery nor an RPC forwarding route",async()=>{
+  const f=await recoveryFixture();
+  for(const path of ["/v1/recovery","/v1/readback","/verify"]){
+    const response=await handle(new Request("https://verifier.test"+path,{method:"POST",
+      headers:{"content-type":"application/json"},body:JSON.stringify(f.recovery)}),f.env);
+    assert.equal(response.status,404);
+  }
+  const response=await handle(new Request("https://verifier.test/v1/verify",{method:"POST",
+    headers:{"content-type":"application/json"},body:JSON.stringify(f.recovery)}),f.env);
+  assert.equal(response.status,401);
+});
+
+test("metadata response and hanging body reads have a bounded deadline",async()=>{
+  const f=await fixture(),keepAlive=setTimeout(()=>{},1000);
+  try {
+    const headerReader=new PublicReleaseReader(f.subject,{timeoutMs:20,fetcher:async(_url,init)=>{
+      assert.equal(init.method,"GET");assert(init.signal instanceof AbortSignal);
+      return new Promise((_,reject)=>init.signal.addEventListener("abort",()=>reject(init.signal.reason),{once:true}));
+    }});
+    await assert.rejects(headerReader.observe(f.subject),/timeout|aborted/i);
+    const bodyReader=new PublicReleaseReader(f.subject,{timeoutMs:20,fetcher:async()=>
+      new Response(new ReadableStream({start(){}}))});
+    await assert.rejects(bodyReader.observe(f.subject),/provider_read_timeout/);
+  } finally {clearTimeout(keepAlive);}
+});
+
+test("asset redirects share one timeout and cancel a stalled final response body",async()=>{
+  const f=await fixture(),signals=[],keepAlive=setTimeout(()=>{},1000);let calls=0;
+  const reader=new PublicReleaseReader(f.subject,{timeoutMs:20,fetcher:async(_url,init)=>{
+    assert.equal(init.method,"GET");signals.push(init.signal);calls++;
+    return calls===1?new Response(null,{status:302,headers:{location:
+      "https://release-assets.githubusercontent.com/asset"}}):
+      new Response(new ReadableStream({start(){}}));
+  }});
+  reader.assets.set(f.subject.packageAssetId,
+    "https://github.com/AyobamiH/agentproof-release-canary/releases/download/"+
+    f.subject.tagName+"/"+f.subject.packageAssetName);
+  try {
+    await assert.rejects(reader.downloadAsset(f.subject.packageAssetId,1024),/provider_read_timeout/);
+    assert.equal(calls,2);assert.equal(signals[0],signals[1]);
+  } finally {clearTimeout(keepAlive);}
 });
