@@ -321,7 +321,7 @@ test("GitHub App failures never expose private keys, JWTs, tokens, IDs, or provi
 test("private broker checks immutable identity and visibility while retaining read-only permissions", async () => {
   const metadata = { id: 424242, full_name: REPOSITORY, private: true, visibility: "private" };
   const fetch = async (request) => {
-    assert.equal(request.redirect, "error");
+    assert.equal(request.redirect, "manual");
     assert.ok(request.signal);
     if (new URL(request.url).pathname.endsWith("/access_tokens")) {
       return Response.json(tokenResponse({ repositories: [metadata] }));
@@ -412,5 +412,49 @@ test("review token rejects wrong immutable identity, extra repositories and writ
     const client = createGithubAppClient(reviewEnv(), REVIEW_REPOSITORY, clientOptions(async () =>
       Response.json(tokenResponse({ repositories: [metadata], ...override }))));
     await assert.rejects(client.json("/repos/" + REVIEW_REPOSITORY), { code: "GITHUB_APP_SCOPE_INVALID" });
+  }
+});
+
+test("GitHub transport works with Workers-compatible Request construction", async () => {
+  const NativeRequest = globalThis.Request;
+  let calls = 0;
+  try {
+    globalThis.Request = class extends NativeRequest {
+      constructor(input, init) {
+        // Workers rejects this mode before fetch; Node alone accepts it.
+        if (init?.redirect === "error") throw new TypeError("Unsupported redirect mode: error");
+        super(input, init);
+      }
+    };
+    const client = createGithubAppClient(appEnv(), REPOSITORY, clientOptions(async (request) => {
+      calls += 1;
+      assert.equal(request.redirect, "manual");
+      return Response.json(request.method === "POST" ? tokenResponse() : { id: 424242, full_name: REPOSITORY, private: false, visibility: "public" });
+    }));
+    client.assertSelectedRepository(await client.json("/repos/Example/project"));
+    assert.equal(calls, 2);
+  } finally { globalThis.Request = NativeRequest; }
+});
+
+test("token mint and evidence redirects fail closed without following or retrying", async () => {
+  for (const stage of ["mint", "evidence"]) {
+    for (const status of [301, 302, 303, 307, 308]) {
+      let calls = 0;
+      let cancelled = false;
+      const client = createGithubAppClient(appEnv(), REPOSITORY, clientOptions(async (request) => {
+        calls += 1;
+        assert.equal(request.redirect, "manual");
+        assert.equal(new URL(request.url).origin, "https://api.github.com");
+        if (stage === "evidence" && request.method === "POST") return Response.json(tokenResponse());
+        return new Response(new ReadableStream({ cancel() { cancelled = true; } }), {
+          status, headers: { location: "https://credential-sink.invalid/private-target", "retry-after": "0" },
+        });
+      }));
+      await assert.rejects(client.json("/repos/Example/project"), {
+        code: "GITHUB_APP_REDIRECT_BLOCKED", message: "GitHub verification redirects are not permitted",
+      });
+      assert.equal(calls, stage === "mint" ? 1 : 2);
+      assert.equal(cancelled, true);
+    }
   }
 });

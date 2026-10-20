@@ -339,6 +339,12 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
       } catch {
         throw githubAppError("GITHUB_APP_REQUEST_FAILED", "GitHub verification request could not be completed");
       }
+      // Workers supports manual redirects, not Fetch's "error" mode.
+      // Never send either the App JWT or installation token to a redirect target.
+      if (response.status >= 300 && response.status < 400) {
+        await discardResponse(response);
+        throw githubAppError("GITHUB_APP_REDIRECT_BLOCKED", "GitHub verification redirects are not permitted");
+      }
       const delayMs = retryDelay(response, now());
       if (delayMs === null) return response;
       await discardResponse(response);
@@ -357,7 +363,7 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
     });
     const response = await boundedFetch(() => new Request(url, {
       method: "POST",
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(30_000),
       headers: { ...apiHeaders(`Bearer ${jwt}`), "content-type": "application/json" },
       body,
@@ -394,7 +400,7 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
     for (let authAttempt = 0; authAttempt < 2; authAttempt += 1) {
       const current = await validInstallationToken(authAttempt > 0);
       const response = await boundedFetch(() => new Request(`${GITHUB_API_ORIGIN}${path}`, {
-        redirect: "error",
+        redirect: "manual",
         signal: AbortSignal.timeout(30_000),
         headers: apiHeaders(`Bearer ${current.token}`),
       }));
