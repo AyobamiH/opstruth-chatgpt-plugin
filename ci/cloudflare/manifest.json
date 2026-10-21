@@ -1,0 +1,101 @@
+{
+  "schema": "proofstate.cloudflare-ci-manifest.v1",
+  "repository": {
+    "name": "AyobamiH/opstruth-chatgpt-plugin",
+    "id": "1345997124"
+  },
+  "project": "proof-state-ci-opstruth",
+  "basePolicy": {
+    "pullRequest": "github-open-pull-request-main-ancestor",
+    "main": "git-first-parent-public-github-corroborated-single-commit-delta"
+  },
+  "preflightTests": [
+    "ci/cloudflare/run.test.mjs"
+  ],
+  "jobs": [
+    {
+      "id": "verify",
+      "node": "24.22.0",
+      "platform": "linux",
+      "commands": [
+        {
+          "tool": "npm",
+          "cwd": ".",
+          "argv": [
+            "run",
+            "check"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "node": "24.22.0",
+      "platform": "linux",
+      "commands": [
+        {
+          "tool": "npm",
+          "cwd": ".",
+          "argv": [
+            "run",
+            "check"
+          ]
+        },
+        {
+          "tool": "npm",
+          "cwd": ".",
+          "argv": [
+            "run",
+            "maintainer:review"
+          ],
+          "env": {
+            "OPSTRUTH_BASE_REF": "{BASE_SHA}",
+            "OPSTRUTH_HEAD_REF": "{SOURCE_SHA}",
+            "OPSTRUTH_CHECK_STATUS": "passed",
+            "OPSTRUTH_BOUNDARY_STATUS": "passed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "release-verifier",
+      "node": "24.22.0",
+      "platform": "linux",
+      "commands": [
+        {
+          "tool": "npm",
+          "cwd": ".",
+          "argv": [
+            "run",
+            "check"
+          ]
+        },
+        {
+          "tool": "npm",
+          "cwd": "services/release-verifier",
+          "argv": [
+            "ci",
+            "--ignore-scripts"
+          ]
+        },
+        {
+          "tool": "npm",
+          "cwd": "services/release-verifier",
+          "argv": [
+            "run",
+            "check"
+          ]
+        },
+        {
+          "tool": "npm",
+          "cwd": "services/release-verifier",
+          "argv": [
+            "audit",
+            "--audit-level=high"
+          ]
+        }
+      ]
+    }
+  ],
+  "excludedCoverage": []
+}

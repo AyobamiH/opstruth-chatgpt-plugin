@@ -1,5 +1,13 @@
 # Current status
 
+## Isolated release recovery checkpoint — 20 October 2026
+
+The separate release lane observed one AgentProof publication of disposable release `416342082` on 18 October, but receipt readback failed before OpsTruth could issue a release decision. [The immutable publication checkpoint](https://github.com/AyobamiH/donestate/blob/main/docs/evidence/agentproof-release-publication-checkpoint-20261018.json) records the original workflow/run, completion and closure of all four temporary services. It establishes no independent OpsTruth release verdict or DoneState VERIFIED.
+
+[DoneState ADR 002](https://github.com/AyobamiH/donestate/blob/main/docs/adr/002-deterministic-release-recovery.md) records the approved recovery: deterministic Durable Object alarms and bounded retry, a fresh authority-signed readback sidecar tied to the original completion, and a private named `ReleaseRecovery` service binding. Pi Durable / PiHarness is deferred. OpsTruth retains its independent key and GET-only release/tag/asset observation; it verifies original approval, receipt, fresh sidecar and separately signed DoneState handoff before its own decision. `READBACK_RECOVERY_ENABLED` is distinct from public activation and grants no inspected-target mutation.
+
+Local implementation validation passed 146 root tests plus the boundary/contract/governance/plugin/documentation checks and 20 isolated verifier tests, including private-entrypoint Workers execution and observation/handoff expiry during I/O. The disabled configuration dry run also passed. [AGENTPROOF-001's source validation checkpoint](https://github.com/AyobamiH/donestate/blob/main/docs/evidence/agentproof-release-recovery-source-checkpoint-20261020.json) retains the source hashes and test evidence. These are local engineering results; protected source review, deployment and live consequence acceptance remain pending. Existing MCP tool authority, directory release evidence and the older DoneState repository-verification milestones are separate. Dated entries below retain their original observation scope.
+
 As of 2026-09-04, OpsTruth `0.4.0` remains publicly visible in the OpenAI Plugins Directory on its owned MCP domain. The directory-release baseline remains commit `186ac58c7f76da942bb1b6bfc8c9b18bd2b812d5`; the independent DoneState verifier runtime has since advanced through the reviewed P0 stack to current `main` `eef00ca4f242cf99d6b39e8c37ae4b84970a86e4`, which is production evidence for the DoneState bridge but does not rewrite the older directory-release record.
 
 ## Verified production identity
@@ -85,3 +93,11 @@ The source-owned provenance kit excludes the provenance asset's own ID and diges
 ### 17 October trust-gate hardening — release verifier source only
 
 An independent release-verifier review exposed a potential receipt-to-DoneState run substitution gap. The isolated service now validates the **original release approval signature**, exact idempotent operation and complete signed receipt, and requires a **separately signed DoneState handoff** binding the run UUID, transaction, subject digest and receipt digest to the **authenticated GitHub Actions run ID**. Missing, forged, stale or transplanted handoffs and untrusted role keys fail before a production-signed response. The disabled service has eight focused tests and Cloudflare build acceptance; existing OpsTruth MCP tools/runtime and the DoneState production service remain untouched. This is not live release adoption or real end-to-end acceptance.
+
+## Native Cloudflare CI continuation — 21 October 2026
+
+Three isolated Pages projects are provisioned and their identity/configuration readback passed: `proof-state-ci-agentproof`, `proof-state-ci-donestate`, and `proof-state-ci-opstruth`. The inspected projects have zero deployments and automatic production/preview builds disabled. The previous session's administrative scripts and provisioning receipts survived on the owner host, but its runner was not present on the recovery branches. The portable runner, explicit manifests and failure tests are now preserved alongside source rather than treated as an already-delivered result.
+
+The selected route is native Pages build execution with a static, exact-source engineering receipt and the native Cloudflare GitHub check. No GitHub runner or owner-machine process is required to execute an accepted build. No Container, plan upgrade, production binding or secret is supplied to fixture execution. Node 22.23.3 and 24.22.0 archives are SHA-256 pinned. Real native execution, trusted check-provider policy migration and release recovery acceptance remain distinct pending gates. The separate AgentProof macOS requirement is preserved. Original release publication remains one; no release workflow is rerun.
+
+See `ci/cloudflare/README.md` and `ci/cloudflare/manifest.json`. The owner authorised implementation and the Cloudflare CI integration on 20 October and continuation on 21 October. Provider-policy changes require genuine exact-head native results before replacing the old check source; no green status is copied or fabricated. PiHarness remains deferred.

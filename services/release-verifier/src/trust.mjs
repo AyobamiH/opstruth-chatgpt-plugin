@@ -63,7 +63,7 @@ function observation(value,subject,published){
   if(published)time(value.publishedAt,"publication_time_invalid");
   else demand(value.publishedAt===null,"draft_publication_time");
 }
-export async function validateReleaseReceipt(receipt,subject,env,now=Date.now()){
+export async function validateReleaseReceipt(receipt,subject,env,now=Date.now(),{historical=false}={}){
   exact(receipt,["payload","proof"],"receipt_shape");
   const {payload:p,proof}=receipt;
   exact(p,RECEIPT_KEYS,"payload_shape");exact(proof,PROOF_KEYS,"proof_shape");
@@ -93,7 +93,7 @@ export async function validateReleaseReceipt(receipt,subject,env,now=Date.now())
   const attempted=time(p.attemptedAt,"attempt_time_invalid");
   const verified=time(p.verifiedAt,"verification_time_invalid");
   demand(attempted<=verified&&verified<=issued&&issued<=now+60_000&&
-    now-issued<=20*60_000,"receipt_timeline_invalid");
+    (historical || now-issued<=20*60_000),"receipt_timeline_invalid");
   exact(p.approval,APPROVAL_KEYS,"approval_shape");
   const a=p.approval;
   demand(a.schema==="agentproof.release.approval.v1"&&a.actionType===p.actionType&&
@@ -124,6 +124,54 @@ export async function validateReleaseReceipt(receipt,subject,env,now=Date.now())
   verify(proof.publicKeyPem,proof.signatureBase64,input,"receipt_signature_invalid");
   return{subjectDigest:p.subjectDigest,receiptPayloadDigest:proof.payloadDigest,
     transactionId:p.transactionId,verifiedAt:verified};
+}
+
+// This is a distinct, binding-only recovery capability. A historical receipt
+// never becomes fresh: the authority signs a new read-only observation bound to
+// its original completion and the exact, maintenance-pinned predecessor.
+export const READBACK_DOMAIN = "agentproof.release-readback-attestation.v1\0";
+export async function validateRecoveryObservation(value,receipt,env,now=Date.now()){
+  exact(value,["schema","runId","transactionId","requestDigest","subjectDigest",
+    "githubRunId","workflowCommit","completionDigest","recoveryAuthorisationDigest",
+    "observedAt","expiresAt","after","readOnly","authorityPublicKeyPem","signatureBase64"],
+    "readback_shape");
+  demand(env.READBACK_RECOVERY_ENABLED==="true"&&
+    UUID.test(env.READBACK_RECOVERY_RUN_ID)&&UUID.test(env.READBACK_RECOVERY_TRANSACTION_ID)&&
+    /^\d{1,20}$/.test(env.READBACK_RECOVERY_GITHUB_RUN_ID)&&
+    HEX64.test(env.READBACK_RECOVERY_COMPLETION_DIGEST)&&
+    HEX64.test(env.READBACK_RECOVERY_AUTHORISATION_DIGEST),"readback_policy_unconfigured");
+  const p=receipt?.payload;
+  demand(value.schema==="agentproof.release-readback-attestation.v1"&&value.readOnly===true&&
+    value.runId===env.READBACK_RECOVERY_RUN_ID&&
+    value.transactionId===env.READBACK_RECOVERY_TRANSACTION_ID&&value.transactionId===p?.transactionId&&
+    value.githubRunId===env.READBACK_RECOVERY_GITHUB_RUN_ID&&
+    value.workflowCommit===env.TRUSTED_SOURCE_SHA&&
+    value.completionDigest===env.READBACK_RECOVERY_COMPLETION_DIGEST&&
+    value.recoveryAuthorisationDigest===env.READBACK_RECOVERY_AUTHORISATION_DIGEST&&
+    value.subjectDigest===p?.subjectDigest&&HEX64.test(value.subjectDigest)&&
+    p.nonce==="release-canary:"+value.githubRunId&&p.idempotencyKey===p.nonce,
+    "readback_binding_invalid");
+  // The hosted request's state directory is deterministic and part of the
+  // original signed completion binding; do not accept an arbitrary digest.
+  const originalRequest={stateDirectory:"/tmp/agentproof-release-canary-"+value.githubRunId,
+    transactionId:p.transactionId,nonce:p.nonce,idempotencyKey:p.idempotencyKey,
+    subject:p.subject,approval:p.approval};
+  demand(HEX64.test(value.requestDigest)&&value.requestDigest===await sha256(stableJson(originalRequest))&&
+    stableJson(value.after)===stableJson(p.after),"readback_evidence_changed");
+  observation(value.after,p.subject,true);
+  const observed=time(value.observedAt,"readback_time_invalid"),expiry=time(value.expiresAt,"readback_time_invalid");
+  demand(observed>=time(p.verifiedAt,"verification_time_invalid")&&
+    observed<=now+30_000&&observed>=now-300_000&&expiry>now&&
+    expiry>observed&&expiry-observed<=300_000&&
+    time(value.after.publishedAt,"publication_time_invalid")<=observed+30_000,
+    "readback_expired");
+  demand(SHA256.test(env.TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT)&&
+    fingerprint(value.authorityPublicKeyPem)===env.TRUSTED_AGENTPROOF_APPROVAL_FINGERPRINT,
+    "readback_signer_untrusted");
+  const {signatureBase64,...unsigned}=value;
+  verify(value.authorityPublicKeyPem,signatureBase64,READBACK_DOMAIN+stableJson(unsigned),
+    "readback_signature_invalid");
+  return {runId:value.runId,transactionId:value.transactionId,githubRunId:value.githubRunId};
 }
 export function validateRunHandoff(handoff,binding,env,now=Date.now()){
   exact(handoff,HANDOFF_KEYS,"handoff_shape");
