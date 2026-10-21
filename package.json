@@ -17,11 +17,14 @@
     "smoke:production": "node scripts/smoke-production.mjs",
     "maintainer:review": "node scripts/maintainer-review.mjs",
     "docs:check": "node scripts/check-documentation-closure.mjs",
-    "check": "npm run lint && npm run check:boundaries && npm test && npm run validate:contracts && npm run validate:vectors && npm run validate:donestate-contract-lock && npm run validate:main-governance && npm run validate:plugin && npm run validate:evals && npm run docs:check",
+    "check": "npm run ci:policy && npm run lint && npm run check:boundaries && npm test && npm run validate:contracts && npm run validate:vectors && npm run validate:donestate-contract-lock && npm run validate:main-governance && npm run validate:plugin && npm run validate:evals && npm run docs:check",
     "dev": "npx --yes wrangler@4.127.0 dev",
     "deploy": "npx --yes wrangler@4.127.0 deploy",
-    "analytics": "node scripts/query-analytics.mjs"
+    "analytics": "node scripts/query-analytics.mjs",
+    "ci:policy": "node ci/cloudflare/policy.mjs && node --test ci/cloudflare/policy.test.mjs"
   },
-  "engines": {"node": ">=20"},
+  "engines": {
+    "node": ">=20"
+  },
   "license": "MIT"
 }
