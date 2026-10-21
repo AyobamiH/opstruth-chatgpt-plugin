@@ -52,4 +52,4 @@ for (const copy of [status, readme]) {
   req(!/main` is currently unprotected/i.test(copy), "copy cannot claim unprotected");
   req(!/Status: `BLOCKED_PROVIDER_ACTION`/.test(copy), "copy cannot claim blocked");
 }
-console.log("OpsTruth main governance: active provider protection verified");
+console.log("OpsTruth main governance: historical protected baseline valid; current native policy requires separate live readback");

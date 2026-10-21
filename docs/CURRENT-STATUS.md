@@ -85,3 +85,7 @@ The source-owned provenance kit excludes the provenance asset's own ID and diges
 ### 17 October trust-gate hardening — release verifier source only
 
 An independent release-verifier review exposed a potential receipt-to-DoneState run substitution gap. The isolated service now validates the **original release approval signature**, exact idempotent operation and complete signed receipt, and requires a **separately signed DoneState handoff** binding the run UUID, transaction, subject digest and receipt digest to the **authenticated GitHub Actions run ID**. Missing, forged, stale or transplanted handoffs and untrusted role keys fail before a production-signed response. The disabled service has eight focused tests and Cloudflare build acceptance; existing OpsTruth MCP tools/runtime and the DoneState production service remain untouched. This is not live release adoption or real end-to-end acceptance.
+
+## Owner-authorised native CI migration — 21 October 2026
+
+See [native CI provider policy](NATIVE-CI-PROVIDER.md) and `governance/native-ci-provider-policy.json` for the current source policy. Historical GitHub Actions enforcement receipts remain dated evidence, not proof of current provider settings. Source, hosted tests, external required-check activation, merge, macOS coverage and production release are recorded separately. This source change does not claim any provider mutation or production deployment.
