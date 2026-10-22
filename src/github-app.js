@@ -59,12 +59,32 @@ function readConfiguration(env = {}, requestedRepository, expectedVisibility = "
   if (keyBytes.byteLength < 256 || keyBytes[0] !== 0x30) {
     throw githubAppError("GITHUB_APP_CONFIGURATION_INVALID", "GitHub App verification configuration is invalid");
   }
-  const allowedRepository = repositoryName(selected);
+  const primaryRepository = repositoryName(selected);
   const requested = repositoryName(requestedRepository);
+  let allowedRepository = primaryRepository;
+  let allowedRepositoryId = selectedRepositoryId;
+  const reviewName = text(env.OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY);
+  const reviewId = text(env.OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY_ID);
+  if (reviewName || reviewId) {
+    const reviewRepository = repositoryName(reviewName);
+    if (!/^[1-9]\d{0,19}$/.test(reviewId) || reviewId === selectedRepositoryId
+      || reviewRepository.owner.toLowerCase() !== primaryRepository.owner.toLowerCase()
+      || !reviewRepository.repo.startsWith("donestate-review-")
+      || reviewRepository.comparison === primaryRepository.comparison) {
+      throw githubAppError("GITHUB_APP_CONFIGURATION_INVALID", "GitHub App verification configuration is invalid");
+    }
+    if (requested.comparison === reviewRepository.comparison) {
+      if (expectedVisibility !== "public") {
+        throw githubAppError("GITHUB_APP_REPOSITORY_NOT_ALLOWED", "GitHub App verification access is not allowed for this repository");
+      }
+      allowedRepository = reviewRepository;
+      allowedRepositoryId = reviewId;
+    }
+  }
   if (allowedRepository.comparison !== requested.comparison) {
     throw githubAppError("GITHUB_APP_REPOSITORY_NOT_ALLOWED", "GitHub App verification access is not allowed for this repository");
   }
-  return { appId, installationId, privateKeyPem, allowedRepository, allowedRepositoryId: selectedRepositoryId, expectedVisibility };
+  return { appId, installationId, privateKeyPem, allowedRepository, allowedRepositoryId, expectedVisibility };
 }
 
 export function githubAppHealth(env = {}) {
@@ -319,6 +339,12 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
       } catch {
         throw githubAppError("GITHUB_APP_REQUEST_FAILED", "GitHub verification request could not be completed");
       }
+      // Workers supports manual redirects, not Fetch's "error" mode.
+      // Never send either the App JWT or installation token to a redirect target.
+      if (response.status >= 300 && response.status < 400) {
+        await discardResponse(response);
+        throw githubAppError("GITHUB_APP_REDIRECT_BLOCKED", "GitHub verification redirects are not permitted");
+      }
       const delayMs = retryDelay(response, now());
       if (delayMs === null) return response;
       await discardResponse(response);
@@ -337,7 +363,7 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
     });
     const response = await boundedFetch(() => new Request(url, {
       method: "POST",
-      redirect: "error",
+      redirect: "manual",
       signal: AbortSignal.timeout(30_000),
       headers: { ...apiHeaders(`Bearer ${jwt}`), "content-type": "application/json" },
       body,
@@ -374,7 +400,7 @@ export function createGithubAppClient(env = {}, requestedRepository, options = {
     for (let authAttempt = 0; authAttempt < 2; authAttempt += 1) {
       const current = await validInstallationToken(authAttempt > 0);
       const response = await boundedFetch(() => new Request(`${GITHUB_API_ORIGIN}${path}`, {
-        redirect: "error",
+        redirect: "manual",
         signal: AbortSignal.timeout(30_000),
         headers: apiHeaders(`Bearer ${current.token}`),
       }));

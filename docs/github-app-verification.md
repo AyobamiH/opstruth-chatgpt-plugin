@@ -58,3 +58,11 @@ Before deployment, a human owner must create a verifier-owned GitHub App separat
 For routine key rotation, create the replacement App private key, update the Cloudflare secret, verify `/health` and a fresh sealed canary, then revoke the prior key. If a key is suspected compromised, revoke it first, replace the Worker secret, redeploy the reviewed commit, and use a new DoneState run. Do not rewrite or re-attest historical run `b4242932-0bc1-4876-a202-634d9c12d72a` or PR #22.
 
 Uninstalling the App, removing the selected repository, reducing a required permission, or revoking its key must make verification block or remain unproven; it must never fall back to a static token or anonymous verification reads. Merge, App creation, installation, secret configuration, deployment, rollback, and canary acceptance remain human-owner actions with separate review evidence.
+
+## Workers redirect compatibility (2026-10-20)
+
+Live reviewer execution reached fixture PR #2, but the verifier failed before making its GitHub request. Cloudflare Workers rejects `redirect: "error"` during Request construction, while the Node test runtime accepts it. The token broker and evidence reads now use `redirect: "manual"` and reject every 3xx response before rate-limit retry handling. Neither an App JWT nor an installation token follows a redirect.
+
+Regression coverage exercises a Workers-compatible Request constructor plus token and evidence redirects for 301, 302, 303, 307 and 308, including response cancellation and no follow-up request. The verifier identity, pinned signing key, exact repository selection and read-only permissions are unchanged. Runtime verification and directory approval remain separate gates.
+
+Runtime reference: https://developers.cloudflare.com/workers/runtime-apis/request/

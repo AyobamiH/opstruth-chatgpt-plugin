@@ -9,12 +9,14 @@ const secretNames = [
   "OPSTRUTH_GITHUB_APP_PRIVATE_KEY_PEM",
 ];
 
-test("deployment configuration pins only the reviewed public verification repository", async () => {
+test("deployment configuration pins the primary repository and exact isolated review fixture", async () => {
   const wranglerSource = await readFile(new URL("wrangler.jsonc", root), "utf8");
   const wrangler = JSON.parse(wranglerSource);
   assert.deepEqual(wrangler.vars, {
     OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY: "AyobamiH/donestate",
     OPSTRUTH_GITHUB_APP_ALLOWED_REPOSITORY_ID: "1348643925",
+    OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY: "AyobamiH/donestate-review-fixture",
+    OPSTRUTH_GITHUB_APP_REVIEW_REPOSITORY_ID: "1427217995",
   });
   for (const secret of secretNames) assert.equal(Object.hasOwn(wrangler.vars, secret), false);
 });
