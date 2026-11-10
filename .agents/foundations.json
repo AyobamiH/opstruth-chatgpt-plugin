@@ -1,0 +1,11 @@
+{
+  "knowledge": ".agents/knowledge/README.md",
+  "required_skill_files": [
+    "SKILL.md",
+    "agents/openai.yaml",
+    "assets/icon.svg",
+    "references/api-checks.md",
+    "references/delivery-controls.md",
+    "references/sources.md"
+  ]
+}
