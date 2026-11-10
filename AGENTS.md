@@ -26,5 +26,5 @@ For every development task, apply the skill scope/evidence review before editing
 
 Update the relevant knowledge in the same change when architecture, behavior, commands or boundaries change. Keep verified rationale and lessons with source links; do not store raw chats, secrets or unverified live status. Existing release, ownership and approval gates remain in force.
 
-Run `python3 .agents/check-foundations.py` for local file/link discovery checks. This lightweight check is not a CI gate or an application/security test.
+Requires Python 3.9 or newer. Run `python3 .agents/check-foundations.py` for the required skill files, AGENTS/README discovery pointers and Markdown links in those files and the knowledge entry point. This lightweight check is not a CI gate or an application/security test.
 Run `python3 .agents/test-foundations.py` for isolated negative discovery fixtures.
