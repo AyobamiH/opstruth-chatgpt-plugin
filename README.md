@@ -72,3 +72,7 @@ The current evidence-signing identity is exposed at `https://mcp.opstruth.io/sig
 GitHub App credentials are owner-provisioned Cloudflare Worker secrets. The deployment workflow verifies only their presence, and production health discloses only the authentication mode, configuration boolean and selected-public-repository scope.
 
 Deployment receipts for the owned MCP domain are indexed in [Owned-domain cutover evidence](docs/OWNED-DOMAIN-CUTOVER.md).
+
+## Agent development
+
+Start with [AGENTS.md](AGENTS.md) for repository-owned skills, project knowledge and validation guidance.
